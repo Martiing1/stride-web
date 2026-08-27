@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --stride-bg: #0a0a0a;
+  --stride-card: #1e1e2e;
+  --stride-accent: #7c3aed;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--stride-bg);
+  color: #ffffff;
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer components {
+  /*
+   * Degradado STRIDE. El logo original va de cian a magenta puro; acá se corta
+   * en el morado de marca para bajarle al rosado, que se comía la identidad
+   * cuando se usaba en bloques grandes.
+   */
+  .wordmark {
+    @apply bg-gradient-to-r from-stride-cyan via-stride-indigo to-stride-accent
+           bg-clip-text text-transparent;
+  }
+
+  /*
+   * Texto sobre foto. La sombra despega las letras del fondo sin necesidad de
+   * oscurecer más la imagen, que es lo que la haría desaparecer.
+   */
+  .text-on-photo {
+    text-shadow: 0 2px 12px rgba(10, 10, 10, 0.85), 0 1px 3px rgba(10, 10, 10, 0.9);
+  }
+
+  /* Mismo degradado como superficie, para bloques y bordes destacados. */
+  .gradient-surface {
+    @apply bg-gradient-to-br from-stride-cyan via-stride-indigo to-stride-accent;
+  }
+
+  /* Borde degradado: el hijo lleva su propio fondo oscuro encima. */
+  .gradient-border {
+    @apply gradient-surface rounded-3xl p-[1.5px];
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-stride-accent px-7 py-3.5
+           font-heading font-semibold text-white transition
+           hover:bg-stride-accentDark focus:outline-none focus:ring-2 focus:ring-stride-accent
+           focus:ring-offset-2 focus:ring-offset-stride-bg disabled:opacity-50;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-full border border-white/20
+           px-7 py-3.5 font-heading font-semibold text-white transition hover:bg-white/10
+           focus:outline-none focus:ring-2 focus:ring-white/40;
+  }
+
+  .card {
+    @apply rounded-2xl border border-white/5 bg-stride-card p-6;
+  }
+
+  .input {
+    @apply w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white
+           placeholder:text-white/35 focus:border-stride-accent focus:outline-none
+           focus:ring-1 focus:ring-stride-accent;
+  }
+
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-white/70;
+  }
+}
