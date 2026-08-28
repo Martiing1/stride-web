@@ -13,7 +13,7 @@ export const revalidate = 600;
 export const metadata = {
   title: "STRIDE ONE — La membresía",
   description:
-    "STRIDE ONE: planes de entrenamiento 5K, 10K y 21K, comunidad cerrada y convenios en Concepción por $31.990 al mes.",
+    "STRIDE ONE: planes de entrenamiento 5K, 10K y 21K, comunidad privada y beneficios en Chile por $31.990 al mes.",
 };
 
 const PILLARS = [
@@ -25,7 +25,7 @@ const PILLARS = [
   {
     icon: Users,
     title: "Una comunidad que te conoce",
-    body: "Un espacio cerrado en Skool donde se habla de lo que cuesta, no solo de los tiempos. Gente que nota cuando desapareces una semana.",
+    body: "Una comunidad privada donde se habla de lo que cuesta, no solo de los tiempos. Gente que nota cuando desapareces una semana.",
   },
   {
     icon: Sparkles,
@@ -34,10 +34,40 @@ const PILLARS = [
   },
   {
     icon: HeartHandshake,
-    title: "Beneficios reales en Concepción",
-    body: "Kinesiología, nutrición, masoterapia, podología y cafeterías. Muestras tu tarjeta digital, la escanean y aplicas el beneficio al instante.",
+    title: "Beneficios reales en todo Chile",
+    body: "Kinesiología, nutrición, deporte, suplementación y cafeterías. Muestras tu tarjeta digital, la escanean y aplicas el beneficio al instante.",
   },
 ];
+
+const FAQS = [
+  {
+    question: "¿Los Social Runs siguen siendo gratis?",
+    answer:
+      "Sí. Los Social Runs son gratuitos y no necesitas ser miembro de STRIDE ONE para participar.",
+  },
+  {
+    question: "¿Necesito tener experiencia corriendo?",
+    answer:
+      "No. Puedes comenzar desde tu nivel actual. Los planes se adaptan a objetivos de 5K, 10K y 21K.",
+  },
+  {
+    question: "¿Qué incluye la membresía?",
+    answer:
+      "Planes de entrenamiento, una comunidad privada, clases en vivo, club de lectura, actividades y acceso a beneficios exclusivos.",
+  },
+  {
+    question: "¿Cómo uso los beneficios?",
+    answer:
+      "Recibes una tarjeta digital con código QR. La presentas en cada comercio asociado y ahí aplican el beneficio vigente.",
+  },
+  {
+    question: "¿Puedo cancelar cuando quiera?",
+    answer:
+      "Sí. La membresía es mensual y puedes cancelarla cuando quieras, sin permanencia obligatoria.",
+  },
+];
+
+const WHATSAPP_MESSAGE = "¡Hola cabros! Quiero saber más de la membresía STRIDE ONE.";
 
 export default async function OnePage() {
   const supabase = await createClient();
@@ -89,7 +119,7 @@ export default async function OnePage() {
                   Quiero que me contacten <ArrowRight className="h-4 w-4" />
                 </Link>
                 <a
-                  href={whatsappLink("Hola STRIDE, quiero saber más de la membresía STRIDE ONE")}
+                  href={whatsappLink(WHATSAPP_MESSAGE)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn-secondary"
@@ -100,10 +130,6 @@ export default async function OnePage() {
               </div>
             </div>
 
-            <p className="mt-4 text-xs text-white/35">
-              La inscripción y el pago se hacen en nuestra comunidad de Skool. Cualquier duda,
-              escríbenos al {SITE.whatsappLabel}.
-            </p>
           </div>
         </section>
 
@@ -133,7 +159,7 @@ export default async function OnePage() {
         <section className="border-t border-white/5 bg-stride-card/30">
           <div className="mx-auto max-w-6xl px-5 py-20">
             <h2 className="font-heading text-3xl font-extrabold text-white sm:text-4xl">
-              Alianzas y beneficios en {SITE.city}
+              Alianzas y beneficios en Chile
             </h2>
             <p className="mt-3 max-w-xl text-white/55">
               Como miembro recibes una tarjeta digital con tu código QR. La muestras en el local, la
@@ -142,6 +168,42 @@ export default async function OnePage() {
 
             <div className="mt-12">
               <BenefitsCatalog benefits={benefits} />
+            </div>
+          </div>
+        </section>
+
+        {/* Preguntas frecuentes */}
+        <section className="border-t border-white/5">
+          <div className="mx-auto max-w-4xl px-5 py-20">
+            <div className="text-center">
+              <span className="text-xs font-semibold uppercase tracking-[0.24em] text-stride-cyan">
+                Preguntas frecuentes
+              </span>
+              <h2 className="mt-3 font-heading text-3xl font-extrabold text-white sm:text-4xl">
+                Lo importante, antes de sumarte
+              </h2>
+            </div>
+
+            <div className="mt-10 space-y-3">
+              {FAQS.map(({ question, answer }) => (
+                <details
+                  key={question}
+                  className="group rounded-2xl border border-white/10 bg-stride-card px-5 py-1 open:border-stride-indigo/60"
+                >
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-5 font-heading font-semibold text-white marker:content-none">
+                    {question}
+                    <span
+                      aria-hidden
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/15 text-lg text-stride-cyan transition-transform group-open:rotate-45"
+                    >
+                      +
+                    </span>
+                  </summary>
+                  <p className="border-t border-white/5 pb-5 pt-4 leading-relaxed text-white/60">
+                    {answer}
+                  </p>
+                </details>
+              ))}
             </div>
           </div>
         </section>
@@ -161,7 +223,7 @@ export default async function OnePage() {
                 Quiero que me contacten <ArrowRight className="h-4 w-4" />
               </Link>
               <a
-                href={whatsappLink("Hola STRIDE, quiero saber más de la membresía STRIDE ONE")}
+                href={whatsappLink(WHATSAPP_MESSAGE)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn-secondary"

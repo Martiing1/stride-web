@@ -43,22 +43,33 @@ export function BenefitsCatalog({ benefits }: { benefits: Benefit[] }) {
   return (
     <div>
       {categories.length > 1 && (
-        <div className="mb-8 flex flex-wrap gap-2">
-          {["todos", ...categories].map((cat) => (
-            <button
-              key={cat}
-              type="button"
-              onClick={() => setActive(cat)}
-              aria-pressed={active === cat}
-              className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                active === cat
-                  ? "bg-stride-accent text-white"
-                  : "border border-white/10 text-white/60 hover:border-white/25 hover:text-white"
-              }`}
-            >
-              {cat === "todos" ? "Todos" : labelFor(cat)}
-            </button>
-          ))}
+        <div className="gradient-border mb-10">
+          <div className="relative overflow-hidden rounded-[calc(1.5rem-1.5px)] bg-[#11111a] p-5 sm:p-6">
+            <div
+              aria-hidden
+              className="absolute -right-12 -top-16 h-40 w-40 rounded-full bg-stride-accent/20 blur-3xl"
+            />
+            <p className="relative text-xs font-semibold uppercase tracking-[0.22em] text-stride-cyan">
+              Explora por categoría
+            </p>
+            <div className="relative mt-4 flex flex-wrap gap-2.5">
+              {["todos", ...categories].map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setActive(cat)}
+                  aria-pressed={active === cat}
+                  className={`rounded-xl border px-4 py-2.5 text-sm font-semibold transition ${
+                    active === cat
+                      ? "border-transparent bg-gradient-to-r from-stride-cyan via-stride-indigo to-stride-accent text-white shadow-[0_0_22px_rgba(99,102,241,0.28)]"
+                      : "border-white/10 bg-white/[0.035] text-white/60 hover:border-stride-indigo/60 hover:text-white"
+                  }`}
+                >
+                  {cat === "todos" ? "Todos" : labelFor(cat)}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
@@ -70,7 +81,7 @@ export function BenefitsCatalog({ benefits }: { benefits: Benefit[] }) {
                 <h3 className="font-heading text-lg font-bold leading-tight text-white">
                   {benefit.business_name}
                 </h3>
-                <p className="mt-0.5 text-xs uppercase tracking-wide text-white/35">
+                <p className="mt-2 inline-flex rounded-full border border-stride-indigo/30 bg-stride-indigo/10 px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-stride-cyan">
                   {labelFor(benefit.category)}
                 </p>
               </div>
