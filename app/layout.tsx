@@ -12,18 +12,17 @@ export const metadata: Metadata = {
     template: "%s · STRIDE",
   },
   description:
-    "Social Runs gratuitos en Concepción para correr, conocer gente y construir una comunidad que te ayude a volver cada semana.",
+    "Una comunidad que se mueve, se encuentra y vuelve cada semana. Correr es la excusa para socializar.",
   openGraph: {
     type: "website",
     locale: "es_CL",
     siteName: "STRIDE",
     url: "/",
     title: "STRIDE — Correr es la excusa para socializar",
-    description:
-      "Social Runs gratuitos en Concepción. Sin nivel mínimo y sin tener que conocer a nadie para llegar.",
+    description: "Una comunidad que se mueve, se encuentra y vuelve cada semana.",
     images: [
       {
-        url: "/og.png",
+        url: "/opengraph-image",
         width: 1200,
         height: 630,
         alt: "STRIDE — Correr es la excusa para socializar",
@@ -33,8 +32,8 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "STRIDE — Correr es la excusa para socializar",
-    description: "Social Runs gratuitos en Concepción.",
-    images: ["/og.png"],
+    description: "Una comunidad que se mueve, se encuentra y vuelve cada semana.",
+    images: ["/opengraph-image"],
   },
 };
 
