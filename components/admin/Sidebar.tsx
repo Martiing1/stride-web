@@ -15,6 +15,9 @@ import {
   Wallet,
   Users,
   HeartHandshake,
+  ClipboardList,
+  Map,
+  CalendarCheck,
   Menu,
   X,
 } from "lucide-react";
@@ -31,17 +34,26 @@ interface NavItem {
 
 const NAV: { section: string; items: NavItem[] }[] = [
   {
-    section: "Operación",
+    section: "Operaciones",
     items: [
       { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
       { href: "/admin/tareas", label: "Tareas", icon: ListTodo },
       { href: "/admin/actas", label: "Actas", icon: FileText },
+      { href: "/admin/equipo", label: "Equipo", icon: Users, roles: ["socio"] },
+    ],
+  },
+  {
+    section: "Social Run",
+    items: [
       { href: "/admin/eventos", label: "Eventos", icon: CalendarDays },
+      { href: "/admin/planificaciones", label: "Planificaciones", icon: ClipboardList },
+      { href: "/admin/rutas", label: "Rutas", icon: Map },
     ],
   },
   {
     section: "Membresía",
     items: [
+      { href: "/admin/membresia", label: "Plan del mes", icon: CalendarCheck, roles: ["socio", "lider_comunidad"] },
       { href: "/admin/miembros", label: "Miembros", icon: IdCard, roles: ["socio", "lider_comunidad"] },
       { href: "/admin/escaneos", label: "Escaneos", icon: ScanLine, roles: ["socio", "lider_comunidad"] },
       { href: "/admin/convenios", label: "Convenios", icon: HeartHandshake, roles: ["socio", "lider_comunidad"] },
@@ -53,7 +65,6 @@ const NAV: { section: string; items: NavItem[] }[] = [
     items: [
       { href: "/admin/kits", label: "Kits e inventario", icon: Package },
       { href: "/admin/finanzas", label: "Finanzas", icon: Wallet, roles: ["socio"] },
-      { href: "/admin/equipo", label: "Equipo", icon: Users, roles: ["socio"] },
     ],
   },
 ];

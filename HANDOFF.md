@@ -103,14 +103,51 @@ Juanjo continúa pendiente y no ha recibido invitación.
 3. En el primer login, cada uno inscribe su app autenticadora (TOTP)
 ```
 
+### 3b. Módulos del ERP — agregados el 27-08-2026
+
+`supabase/migration-002-erp.sql` **ya ejecutado** (tablas `routes`, `event_plans`,
+`membership_checklist_templates`, `membership_month_items`, columnas nuevas en
+`transactions` y `events`, vista `monthly_finance_summary`, buckets `rutas` y
+`comprobantes`).
+
+Navegación reorganizada en cuatro secciones: **Operaciones**, **Social Run**,
+**Membresía** y **Recursos**.
+
+| Módulo | Estado |
+|---|---|
+| Leads en Kanban + alta manual | Listo |
+| Plan del mes de la membresía (checklist editable) | Listo |
+| Social Run › Planificaciones (formulario estructurado) | Listo |
+| Social Run › Rutas (GPX + link + seguridad) | Listo |
+| Finanzas (CRUD, comprobantes, balance, proyección) | Listo |
+| **Kits e inventario — solo lectura, falta CRUD** | Pendiente |
+| Gestión de convenios y testimonios desde el ERP | Pendiente (hoy se editan en Supabase) |
+
 ### 4. Deploy
 
-Vercel, un proyecto, tres dominios: `stridechile.cl`, `www` y `admin`.
-DNS apunta a Vercel (`76.76.21.21` y `cname.vercel-dns.com`), pero los tres hosts
-aún fallan el handshake HTTPS. El proyecto Vercel existente `stride-web` está
-enlazado a una versión antigua del repo de GitHub; el código Next.js actual no
-está enlazado localmente a Git ni a `.vercel`. Falta desplegar esta versión,
-cargar las variables de Supabase y asociar/verificar los tres dominios.
+Hecho el 27-08-2026:
+
+- Git inicializado con un commit; `.env.local` verificado fuera del control de versiones.
+- Proyecto local enlazado a `stride-web` (`vercel link`).
+- **`framework` corregido de `null` a `nextjs`** — estaba configurado como sitio
+  estático, por eso los builds no arrancaban nunca.
+- **`.vercelignore` creado** — sin él el CLI intentaba subir los 478 MB de
+  `node_modules` y el deploy se colgaba.
+- Las 4 variables de entorno cargadas en Production, Preview y Development.
+  `SUPABASE_SERVICE_ROLE_KEY` existe solo en Production y Preview, como *Secret*.
+- **Repo `Martiing1/stride-web` DESCONECTADO** del proyecto Vercel, por orden
+  expresa de Martín: la landing antigua no debe volver a desplegarse. Lo que se
+  publica es la carpeta local.
+- Los tres dominios agregados y **verificados** (`verified: true`).
+
+**BLOQUEADO:** los tres deployments quedan en estado `BLOCKED`. No es el código
+—compila local sin errores— sino la cuenta: plan **Hobby**, solo 3 deploys en 24 h
+y cero cuota consumida. La hipótesis es la detección de uso comercial de Vercel
+(la cuenta tiene FinCore, Norte y Stride). El motivo exacto solo se lee entrando
+al deployment en el panel; la API no lo expone.
+
+El aviso "DNS Change Recommended" de los dominios NO es un error: Vercel prefiere
+su IP nueva para el registro A, pero `76.76.21.21` funciona.
 
 ### 5. v2 — no empezado
 

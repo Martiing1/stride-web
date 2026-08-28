@@ -1,0 +1,13 @@
+# Vercel instala dependencias y compila en su propio entorno: subir estas
+# carpetas desde local hace que el deploy se cuelgue en la etapa de upload.
+node_modules
+.next
+.next-verify
+
+.git
+.env
+.env.local
+.env*.local
+
+.DS_Store
+*.log

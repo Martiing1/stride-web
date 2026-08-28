@@ -15,49 +15,71 @@ export function ActivationForm() {
 
   useEffect(() => {
     let active = true;
-    let resolved = false;
 
-    const markSessionReady = async () => {
+    /** Borra el token de la barra de direcciones apenas se canjea. */
+    const cleanUrl = () =>
+      window.history.replaceState({}, "", window.location.pathname);
+
+    const start = async () => {
+      const hash = new URLSearchParams(window.location.hash.slice(1));
+
+      // Enlace ya usado o vencido: Supabase lo informa en el propio hash.
+      if (hash.get("error")) {
+        if (!active) return;
+        cleanUrl();
+        setError(
+          hash.get("error_code") === "otp_expired"
+            ? "Este enlace ya venció o fue abierto antes por el escáner de tu correo. Solicita uno nuevo."
+            : "Este enlace no es válido. Solicita uno nuevo para continuar."
+        );
+        setState("invalid");
+        return;
+      }
+
+      const accessToken = hash.get("access_token");
+      const refreshToken = hash.get("refresh_token");
+
+      // El enlace de recuperación llega en flujo implícito (tokens en el
+      // hash), pero createBrowserClient usa PKCE y no lo procesa solo. Hay
+      // que canjear los tokens a mano.
+      if (accessToken && refreshToken) {
+        const { error: sessionError } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+
+        if (!active) return;
+        cleanUrl();
+
+        if (sessionError) {
+          setError("Este enlace ya venció. Solicita uno nuevo para continuar.");
+          setState("invalid");
+          return;
+        }
+
+        setState("ready");
+        return;
+      }
+
+      // Sin tokens en la URL: puede haber una sesión previa en cookies.
       const {
         data: { session },
       } = await supabase.auth.getSession();
 
       if (!active) return;
+
       if (session) {
-        resolved = true;
-        window.history.replaceState({}, "", window.location.pathname);
         setState("ready");
       } else {
-        const params = new URLSearchParams(window.location.hash.slice(1));
-        if (params.get("error")) {
-          resolved = true;
-          setError("Este enlace ya fue usado o venció. Solicita uno nuevo para continuar.");
-          setState("invalid");
-        }
+        setError("No encontramos una sesión válida. Abre el enlace más reciente de tu correo.");
+        setState("invalid");
       }
     };
 
-    void markSessionReady();
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!active || !session) return;
-      resolved = true;
-      window.history.replaceState({}, "", window.location.pathname);
-      setState("ready");
-    });
-
-    const timeout = window.setTimeout(() => {
-      if (active && !resolved) {
-        setState("invalid");
-        setError("No encontramos una sesión válida. Abre el enlace más reciente de tu correo.");
-      }
-    }, 4000);
+    void start();
 
     return () => {
       active = false;
-      window.clearTimeout(timeout);
-      subscription.unsubscribe();
     };
   }, [supabase]);
 

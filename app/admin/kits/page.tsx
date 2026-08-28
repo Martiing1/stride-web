@@ -1,4 +1,5 @@
-import { Package, AlertTriangle } from "lucide-react";
+import Link from "next/link";
+import { Package, AlertTriangle, ArrowRight } from "lucide-react";
 import { requireTeamMember } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { formatCLP } from "@/lib/site";
@@ -41,6 +42,12 @@ export default async function KitsPage() {
           {pendientes.length} kits pendientes de entrega · stock valorizado en{" "}
           {formatCLP(valorStock)}
         </p>
+        <Link
+          href="/admin/membresia"
+          className="mt-3 inline-flex items-center gap-1.5 text-sm text-stride-cyan hover:underline"
+        >
+          Ver el plan del mes de la membresía <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
       </header>
 
       <section>

@@ -84,6 +84,7 @@ export interface StrideEvent {
   cover_image_url: string | null;
   capacity: number | null;
   spots_left: number | null;
+  route_id: string | null;
   owner_id: string | null;
   status: EventStatus;
   min_confirmations: number;
@@ -199,6 +200,80 @@ export interface InventoryItem {
   created_at: string;
 }
 
+export interface Route {
+  id: string;
+  name: string;
+  distance_km: number | null;
+  difficulty: "facil" | "media" | "dificil" | null;
+  start_point: string | null;
+  end_point: string | null;
+  gpx_url: string | null;
+  external_url: string | null;
+  traffic_lights: number | null;
+  safety_notes: string | null;
+  surface: string | null;
+  notes: string | null;
+  created_by: string | null;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EventPlan {
+  id: string;
+  event_id: string;
+  route_id: string | null;
+  meeting_time: string | null;
+  warmup_notes: string | null;
+  icebreaker: string | null;
+  groups_notes: string | null;
+  post_run_notes: string | null;
+  lead_id: string | null;
+  sweeper_id: string | null;
+  photographer_id: string | null;
+  materials: string | null;
+  sponsor_notes: string | null;
+  contingency: string | null;
+  status: "borrador" | "lista" | "ejecutada";
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChecklistTemplate {
+  id: string;
+  title: string;
+  category: string | null;
+  description: string | null;
+  sort_order: number;
+  active: boolean;
+  created_at: string;
+}
+
+export interface MonthChecklistItem {
+  id: string;
+  month: string;
+  template_id: string | null;
+  title: string;
+  category: string | null;
+  notes: string | null;
+  done: boolean;
+  done_at: string | null;
+  done_by: string | null;
+  assignee_id: string | null;
+  due_date: string | null;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface MonthlyFinanceSummary {
+  month: string;
+  ingresos: number | null;
+  gastos: number | null;
+  resultado: number;
+  movimientos: number;
+}
+
 export interface Transaction {
   id: string;
   kind: "ingreso" | "gasto";
@@ -208,6 +283,8 @@ export interface Transaction {
   event_id: string | null;
   member_id: string | null;
   occurred_on: string;
+  receipt_url: string | null;
+  payment_method: string | null;
   created_by: string | null;
   created_at: string;
 }

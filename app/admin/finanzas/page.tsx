@@ -1,11 +1,22 @@
-import { TrendingUp, TrendingDown, Wallet } from "lucide-react";
+import { TrendingUp, TrendingDown, Wallet, LineChart } from "lucide-react";
 import { requireTeamMember } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { formatCLP, SITE } from "@/lib/site";
 import { todayInChile } from "@/lib/membership";
-import type { Transaction } from "@/lib/types";
+import { FinanceManager } from "@/components/admin/FinanceManager";
+import type { Transaction, StrideEvent, MonthlyFinanceSummary } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+
+const MONTH_NAMES = [
+  "Ene", "Feb", "Mar", "Abr", "May", "Jun",
+  "Jul", "Ago", "Sep", "Oct", "Nov", "Dic",
+];
+
+function monthLabel(month: string): string {
+  const [y, m] = month.split("-").map(Number);
+  return `${MONTH_NAMES[m - 1]} ${y}`;
+}
 
 export default async function FinanzasPage() {
   await requireTeamMember(["socio"]);
@@ -14,29 +25,35 @@ export default async function FinanzasPage() {
   const today = todayInChile();
   const monthStart = `${today.slice(0, 7)}-01`;
 
-  const [{ data: txData }, { count: activeMembers }] = await Promise.all([
-    supabase.from("transactions").select("*").order("occurred_on", { ascending: false }).limit(100),
-    supabase.from("members").select("*", { count: "exact", head: true }).eq("status", "activa"),
-  ]);
+  const [{ data: txData }, { count: activeMembers }, { data: eventsData }, { data: summaryData }] =
+    await Promise.all([
+      supabase.from("transactions").select("*").order("occurred_on", { ascending: false }).limit(300),
+      supabase.from("members").select("*", { count: "exact", head: true }).eq("status", "activa"),
+      supabase.from("events").select("*").order("event_date", { ascending: false }).limit(40),
+      supabase.from("monthly_finance_summary").select("*").limit(12),
+    ]);
 
   const transactions = (txData ?? []) as Transaction[];
+  const summary = (summaryData ?? []) as MonthlyFinanceSummary[];
+
   const thisMonth = transactions.filter((t) => t.occurred_on >= monthStart);
+  const ingresos = thisMonth.filter((t) => t.kind === "ingreso").reduce((s, t) => s + t.amount_clp, 0);
+  const gastos = thisMonth.filter((t) => t.kind === "gasto").reduce((s, t) => s + t.amount_clp, 0);
+  const resultado = ingresos - gastos;
 
-  const ingresos = thisMonth
-    .filter((t) => t.kind === "ingreso")
-    .reduce((sum, t) => sum + t.amount_clp, 0);
-  const gastos = thisMonth
-    .filter((t) => t.kind === "gasto")
-    .reduce((sum, t) => sum + t.amount_clp, 0);
-
-  // Ingreso recurrente teórico de la membresía, para contrastarlo con lo registrado.
+  // Proyección: lo que entra si todos los miembros activos siguen pagando.
   const mrr = (activeMembers ?? 0) * SITE.membership.priceCLP;
+
+  const maxAbs = Math.max(
+    1,
+    ...summary.map((s) => Math.max(s.ingresos ?? 0, s.gastos ?? 0))
+  );
 
   return (
     <div className="space-y-8">
       <header>
         <h1 className="font-heading text-3xl font-extrabold text-white">Finanzas</h1>
-        <p className="mt-1 text-white/50">Movimientos del mes en curso.</p>
+        <p className="mt-1 text-white/50">Movimientos, balance mensual y proyección.</p>
       </header>
 
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -45,16 +62,11 @@ export default async function FinanzasPage() {
           { label: "Gastos del mes", value: formatCLP(gastos), icon: TrendingDown, tone: "text-red-400" },
           {
             label: "Resultado",
-            value: formatCLP(ingresos - gastos),
+            value: formatCLP(resultado),
             icon: Wallet,
-            tone: ingresos - gastos >= 0 ? "text-emerald-400" : "text-red-400",
+            tone: resultado >= 0 ? "text-emerald-400" : "text-red-400",
           },
-          {
-            label: "MRR membresía",
-            value: formatCLP(mrr),
-            icon: TrendingUp,
-            tone: "text-stride-accent",
-          },
+          { label: "Proyección membresía", value: formatCLP(mrr), icon: LineChart, tone: "text-stride-cyan" },
         ].map(({ label, value, icon: Icon, tone }) => (
           <div key={label} className="card">
             <div className="flex items-start justify-between">
@@ -67,41 +79,53 @@ export default async function FinanzasPage() {
       </section>
 
       <p className="card text-xs leading-relaxed text-white/40">
-        El MRR es teórico: {activeMembers ?? 0} miembros activos ×{" "}
-        {SITE.membership.priceLabel}. Como el cobro se hace en Skool, contrástalo con lo que
-        efectivamente llegó ahí.
+        La proyección es teórica: {activeMembers ?? 0} miembros activos ×{" "}
+        {SITE.membership.priceLabel}. Como el cobro se hace en Skool, contrástala con lo que
+        efectivamente llegó ahí antes de tomarla como ingreso.
       </p>
 
-      <section>
-        <h2 className="mb-4 font-heading text-xl font-bold text-white">Movimientos</h2>
-        {transactions.length > 0 ? (
-          <ul className="space-y-2">
-            {transactions.map((t) => (
-              <li key={t.id} className="card flex items-center justify-between gap-4 py-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm text-white">{t.description ?? t.category}</p>
-                  <p className="text-xs text-white/40">
-                    {t.occurred_on.split("-").reverse().join("/")} · {t.category}
+      {/* Balance mensual */}
+      {summary.length > 0 && (
+        <section className="card">
+          <h2 className="mb-5 font-heading text-lg font-bold text-white">Balance mensual</h2>
+          <ul className="space-y-3">
+            {summary.map((s) => {
+              const ing = s.ingresos ?? 0;
+              const gas = s.gastos ?? 0;
+              return (
+                <li key={s.month}>
+                  <div className="mb-1 flex items-center justify-between text-sm">
+                    <span className="text-white/70">{monthLabel(s.month)}</span>
+                    <span className={`font-heading font-bold ${s.resultado >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                      {s.resultado >= 0 ? "+" : "−"}{formatCLP(Math.abs(s.resultado))}
+                    </span>
+                  </div>
+                  {/* Dos barras a la misma escala: comparables entre meses. */}
+                  <div className="space-y-1">
+                    <div className="h-1.5 overflow-hidden rounded-full bg-white/5">
+                      <div className="h-full rounded-full bg-emerald-500"
+                        style={{ width: `${(ing / maxAbs) * 100}%` }} />
+                    </div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-white/5">
+                      <div className="h-full rounded-full bg-red-500"
+                        style={{ width: `${(gas / maxAbs) * 100}%` }} />
+                    </div>
+                  </div>
+                  <p className="mt-1 text-[11px] text-white/35">
+                    {formatCLP(ing)} ingresos · {formatCLP(gas)} gastos · {s.movimientos} movimientos
                   </p>
-                </div>
-                <span
-                  className={`shrink-0 font-heading font-bold ${
-                    t.kind === "ingreso" ? "text-emerald-400" : "text-red-400"
-                  }`}
-                >
-                  {t.kind === "ingreso" ? "+" : "−"}
-                  {formatCLP(t.amount_clp)}
-                </span>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
-        ) : (
-          <div className="card flex flex-col items-center gap-3 py-12 text-center">
-            <Wallet className="h-9 w-9 text-white/25" />
-            <p className="text-sm text-white/50">Todavía no hay movimientos registrados.</p>
-          </div>
-        )}
-      </section>
+        </section>
+      )}
+
+      <FinanceManager
+        transactions={transactions}
+        events={(eventsData ?? []) as StrideEvent[]}
+        today={today}
+      />
     </div>
   );
 }

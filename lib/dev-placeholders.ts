@@ -43,6 +43,7 @@ const eventBase = {
   route_gpx_url: null,
   cover_image_url: null,
   capacity: 40,
+  route_id: null,
   owner_id: null,
   status: "confirmado" as const,
   min_confirmations: 3,
