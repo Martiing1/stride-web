@@ -7,6 +7,7 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { EventCard } from "@/components/EventCard";
 import { EventAgenda } from "@/components/EventAgenda";
 import { LeadForm } from "@/components/LeadForm";
+import { BrandMarquee } from "@/components/BrandMarquee";
 import { todayInChile } from "@/lib/membership";
 import { isDev, DEV_EVENTS } from "@/lib/dev-placeholders";
 import { SITE } from "@/lib/site";
@@ -68,6 +69,8 @@ export default async function EventosPage() {
             </p>
           </div>
         </section>
+
+        <BrandMarquee />
 
         <section className="mx-auto max-w-6xl px-5 py-16">
           <h2 className="mb-8 font-heading text-2xl font-bold text-white">Próximos</h2>

@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { Instagram, MessageCircle } from "lucide-react";
+import { Instagram } from "lucide-react";
 import { SITE, whatsappLink } from "@/lib/site";
 import { StrideLogo } from "@/components/StrideLogo";
+import { WhatsAppIcon } from "@/components/WhatsAppIcon";
 
 export function SiteFooter() {
   return (
@@ -43,13 +44,13 @@ export function SiteFooter() {
               <Instagram className="h-5 w-5" />
             </a>
             <a
-              href={whatsappLink("Hola STRIDE, quiero saber más")}
+              href={whatsappLink("¡Hola cabros! Quiero saber más de STRIDE.")}
               target="_blank"
               rel="noopener noreferrer"
               aria-label="WhatsApp de STRIDE"
-              className="rounded-full border border-white/10 p-2.5 text-white/60 transition hover:border-white/30 hover:text-white"
+              className="rounded-full bg-[#25d366] p-2.5 text-white shadow-[0_0_18px_rgba(37,211,102,0.2)] transition hover:bg-[#20bd5a]"
             >
-              <MessageCircle className="h-5 w-5" />
+              <WhatsAppIcon className="h-5 w-5" />
             </a>
           </div>
         </div>

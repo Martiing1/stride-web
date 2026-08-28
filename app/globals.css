@@ -60,6 +60,23 @@ body {
            focus:outline-none focus:ring-2 focus:ring-white/40;
   }
 
+  .btn-whatsapp {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-7 py-3.5
+           font-heading font-semibold text-white transition focus:outline-none focus:ring-2
+           focus:ring-offset-2 focus:ring-offset-stride-bg;
+    background-color: #25d366;
+    box-shadow: 0 0 24px rgba(37, 211, 102, 0.22);
+  }
+
+  .btn-whatsapp:hover {
+    background-color: #20bd5a;
+    box-shadow: 0 0 30px rgba(37, 211, 102, 0.34);
+  }
+
+  .btn-whatsapp:focus-visible {
+    --tw-ring-color: #25d366;
+  }
+
   /* Haz de luz que cruza los CTA destacados sin mover su contenido. */
   .btn-shine {
     position: relative;

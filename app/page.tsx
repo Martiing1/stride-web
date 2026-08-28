@@ -19,7 +19,7 @@ const STEPS = [
   {
     icon: Ticket,
     title: "Reservas tu cupo",
-    body: "Tomas tu ticket online y te llega el punto de encuentro. El día del evento llegas, te escaneamos el ticket y estás dentro. Eso es todo el trámite.",
+    body: "Eliges la fecha y reservas tu cupo online. Antes del encuentro recibes la información de la ruta y el lugar exacto. Ese día solo llegas, validamos tu ticket y partimos.",
   },
   {
     icon: Footprints,

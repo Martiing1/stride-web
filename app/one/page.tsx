@@ -1,10 +1,11 @@
-import { ArrowRight, MessageCircle, Users, Target, Sparkles, HeartHandshake } from "lucide-react";
+import { ArrowRight, Users, Target, Sparkles, HeartHandshake } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { safeQuery } from "@/lib/safe-query";
 import { SiteNav } from "@/components/SiteNav";
 import { SiteFooter } from "@/components/SiteFooter";
 import { BenefitsCatalog } from "@/components/BenefitsCatalog";
+import { WhatsAppIcon } from "@/components/WhatsAppIcon";
 import { SITE, whatsappLink } from "@/lib/site";
 import type { Benefit } from "@/lib/types";
 
@@ -122,9 +123,9 @@ export default async function OnePage() {
                   href={whatsappLink(WHATSAPP_MESSAGE)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="btn-secondary"
+                  className="btn-whatsapp"
                 >
-                  <MessageCircle className="h-4 w-4" />
+                  <WhatsAppIcon className="h-5 w-5" />
                   Tengo dudas
                 </a>
               </div>
@@ -226,9 +227,9 @@ export default async function OnePage() {
                 href={whatsappLink(WHATSAPP_MESSAGE)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="btn-secondary"
+                className="btn-whatsapp"
               >
-                <MessageCircle className="h-4 w-4" />
+                <WhatsAppIcon className="h-5 w-5" />
                 {SITE.whatsappLabel}
               </a>
             </div>
