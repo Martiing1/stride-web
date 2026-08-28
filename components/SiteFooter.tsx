@@ -12,9 +12,7 @@ export function SiteFooter() {
           <div className="max-w-xs">
             <StrideLogo large />
             <p className="mt-2 text-sm leading-relaxed text-white/50">
-              En STRIDE usamos el movimiento para hacer algo que cuesta mucho más en solitario:
-              sostener el hábito. Social Runs, experiencias y una comunidad real que te ayuda a
-              volver, incluso cuando la semana no salió perfecta.
+              Social Runs, experiencias y una comunidad que te ayuda a sostener el hábito.
             </p>
           </div>
 

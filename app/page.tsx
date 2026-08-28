@@ -92,9 +92,6 @@ export default async function HomePage() {
           <h2 className="mt-3 font-heading text-3xl font-extrabold leading-tight text-white sm:text-4xl">
             Próximos encuentros
           </h2>
-          <p className="mt-3 max-w-lg text-white/65">
-            Gratis y abiertos. Reservas tu cupo, llegas y corres. Eso es todo.
-          </p>
 
           <div className="mt-10">
             <EventAgenda events={events} />
@@ -104,16 +101,9 @@ export default async function HomePage() {
         {/* Cómo funciona */}
         <section className="border-y border-white/5 bg-stride-card/25">
           <div className="mx-auto max-w-5xl px-5 py-20">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-stride-cyan">
-              Simplicidad
-            </p>
-            <h2 className="mt-3 font-heading text-3xl font-extrabold text-white sm:text-4xl">
+            <h2 className="font-heading text-3xl font-extrabold text-white sm:text-4xl">
               Cómo funcionan los Social Runs
             </h2>
-          <p className="mt-3 max-w-lg text-white/65">
-              En cada fecha nos dividimos en tres grupos para correr a ritmos distintos. Tú eliges
-              dónde sentirte cómodo y avanzas acompañado, sin importar tu nivel.
-            </p>
 
             <ol className="mt-12 grid gap-6 md:grid-cols-3">
               {STEPS.map(({ icon: Icon, title, body }, i) => (
@@ -199,10 +189,8 @@ export default async function HomePage() {
                 Da el primer paso
               </h2>
               <p className="mt-4 max-w-md leading-relaxed text-white/70">
-                A veces quieres empezar, pero hacerlo solo convierte el movimiento en otra tarea
-                que cuesta sostener. Cuéntanos si buscas venir a un Social Run, recuperar la
-                constancia o conocer {SITE.membership.name}; así podremos contactarte con el
-                siguiente paso que realmente calce contigo.
+                Cuéntanos si quieres venir a un Social Run, recuperar la constancia o entrar a{" "}
+                {SITE.membership.name}. Te ayudamos a dar el siguiente paso.
               </p>
             </div>
 
