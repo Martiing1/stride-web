@@ -27,7 +27,7 @@ export const SITE = {
 
   /** Números que se muestran en el hero. Actualizar cuando cambien. */
   stats: {
-    members: "+200",
+    members: "+2.000",
     events: "+100",
     years: "2 años",
   },

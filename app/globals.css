@@ -60,6 +60,60 @@ body {
            focus:outline-none focus:ring-2 focus:ring-white/40;
   }
 
+  /* Haz de luz que cruza los CTA destacados sin mover su contenido. */
+  .btn-shine {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  .btn-shine::after {
+    content: "";
+    position: absolute;
+    inset: -70% auto -70% 0;
+    width: 38%;
+    pointer-events: none;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.08),
+      rgba(255, 255, 255, 0.78),
+      rgba(255, 255, 255, 0.08),
+      transparent
+    );
+    filter: blur(2px);
+    transform: translateX(-240%) rotate(16deg);
+    animation: stride-beam 3.1s ease-in-out infinite;
+  }
+
+  /* El degradado recorre el botón continuamente, sin cambiar sus dimensiones. */
+  .btn-gradient-flow {
+    background-image: linear-gradient(110deg, #00e5ff, #6366f1, #7c3aed, #00e5ff);
+    background-size: 240% 240%;
+    animation: stride-gradient-flow 4s ease infinite;
+  }
+
+  /*
+   * Una misma ola de color atraviesa las tres cifras del hero. Cada número
+   * comparte duración y dirección, pero parte a un tercio distinto del ciclo.
+   */
+.stat-gradient-flow {
+  color: transparent;
+  background-image: repeating-linear-gradient(
+    90deg,
+    #00e5ff 0%,
+    #6366f1 16.66%,
+    #7c3aed 33.33%,
+    #00e5ff 50%
+  );
+  /* El patrón ocupa exactamente la mitad del fondo: al avanzar una mitad,
+     el final coincide píxel a píxel con el inicio y el bucle no salta. */
+  background-size: 200% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+    animation: stride-stats-flow 24s linear infinite;
+  }
+
   .card {
     @apply rounded-2xl border border-white/5 bg-stride-card p-6;
   }
@@ -72,5 +126,45 @@ body {
 
   .label {
     @apply mb-1.5 block text-sm font-medium text-white/70;
+  }
+}
+
+@keyframes stride-beam {
+  0%,
+  18% {
+    transform: translateX(-240%) rotate(16deg);
+  }
+  58%,
+  100% {
+    transform: translateX(390%) rotate(16deg);
+  }
+}
+
+@keyframes stride-gradient-flow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes stride-stats-flow {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-shine::after,
+  .btn-gradient-flow,
+  .stat-gradient-flow {
+    animation: none;
   }
 }

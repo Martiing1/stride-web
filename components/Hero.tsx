@@ -87,9 +87,12 @@ export function Hero() {
             { value: SITE.stats.members, label: "Miembros" },
             { value: SITE.stats.events, label: "Eventos" },
             { value: SITE.stats.years, label: "En Concepción" },
-          ].map((stat) => (
+          ].map((stat, index) => (
             <div key={stat.label} className="px-7">
-              <dt className="wordmark font-heading text-3xl font-extrabold sm:text-4xl">
+              <dt
+                className="stat-gradient-flow font-heading text-3xl font-extrabold sm:text-4xl"
+                style={{ animationDelay: `${index * -8}s` }}
+              >
                 {stat.value}
               </dt>
               <dd className="mt-1 text-[11px] uppercase tracking-widest text-white/50">

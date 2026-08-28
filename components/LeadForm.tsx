@@ -199,7 +199,11 @@ export function LeadForm({ source = "landing" }: { source?: string }) {
 
       {error && <p className="text-sm text-red-400">{error}</p>}
 
-      <button type="submit" disabled={status === "sending"} className="btn-primary w-full">
+      <button
+        type="submit"
+        disabled={status === "sending"}
+        className="btn-primary btn-gradient-flow btn-shine w-full"
+      >
         {status === "sending" ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin" /> Enviando…

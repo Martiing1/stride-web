@@ -39,7 +39,7 @@ const ONE_PERKS = [
   "Planes de entrenamiento 5K, 10K y 21K",
   "Clases en vivo y club de lectura",
   "Regalos, sorteos y kit de bienvenida",
-  "Retiros y viajes a maratones",
+  "Descuentos en retiros y viajes a maratones",
 ];
 
 export default async function HomePage() {
@@ -103,7 +103,7 @@ export default async function HomePage() {
 
         {/* Cómo funciona */}
         <section className="border-y border-white/5 bg-stride-card/25">
-          <div className="mx-auto max-w-6xl px-5 py-20">
+          <div className="mx-auto max-w-5xl px-5 py-20">
             <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-stride-cyan">
               Simplicidad
             </p>
@@ -158,14 +158,15 @@ export default async function HomePage() {
 
                 <p className="mt-5 max-w-md leading-relaxed text-white/70">
                   Un Social Run es una tarde. La membresía es lo que viene después: acá encuentras
-                  la <strong className="font-semibold text-white">continuidad</strong>, la gente que
-                  te espera cada semana y los beneficios de ser parte de STRIDE todo el año.
+                  una <strong className="font-semibold text-white underline decoration-stride-cyan/80 decoration-2 underline-offset-4">comunidad exclusiva</strong>,
+                  la continuidad, la gente que te espera cada semana y los beneficios de ser parte
+                  de STRIDE todo el año.
                 </p>
 
                 <div className="mt-8 flex flex-wrap items-center gap-5">
                   <Link
                     href="#sumate"
-                    className="btn-primary gradient-surface shadow-[0_0_24px_rgba(99,102,241,0.3)] hover:brightness-110"
+                    className="btn-primary btn-shine gradient-surface shadow-[0_0_24px_rgba(99,102,241,0.3)] hover:brightness-110"
                   >
                     Quiero que me contacten <ArrowRight className="h-4 w-4" />
                   </Link>
