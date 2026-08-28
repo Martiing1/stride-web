@@ -5,6 +5,9 @@ const BRANDS = [
   "Inmerso",
   "ASICS",
   "Chile Suplementos",
+  "Pura Vida",
+  "The Body Club",
+  "Master Suplementos",
 ];
 
 /** Franja continua de marcas documentadas como colaboradoras de STRIDE. */
