@@ -64,8 +64,15 @@ export function BudgetsManager({ rows, year, month }: { rows: BudgetRow[]; year:
             </select>
           </div>
           <div>
-            <label htmlFor="planned_clp" className="label">Meta del mes (CLP)</label>
+            <label htmlFor="planned_clp" className="label">Meta mensual (CLP)</label>
             <input id="planned_clp" name="planned_clp" type="number" min={0} required className="input" placeholder="150000" />
+          </div>
+          <div>
+            <label htmlFor="span" className="label">Vigencia</label>
+            <select id="span" name="span" defaultValue="1" className="input w-auto">
+              <option value="1" className="bg-stride-card">Solo {MONTHS[month - 1]}</option>
+              <option value="3" className="bg-stride-card">Trimestre ({MONTHS[month - 1]}–{MONTHS[(month + 1) % 12]})</option>
+            </select>
           </div>
           <button type="submit" disabled={pending} className="btn-primary">
             {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Check className="h-4 w-4" /> Guardar</>}

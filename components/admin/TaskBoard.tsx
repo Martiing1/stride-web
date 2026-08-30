@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useTransition, type DragEvent, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Loader2, X, ListTodo, Check, Columns3, Rows3, CalendarDays, UserRound, Tag, FileText } from "lucide-react";
-import { updateTaskStatus, createTask } from "@/app/admin/tareas/actions";
+import { updateTaskStatus, createTask, updateTaskNotes } from "@/app/admin/tareas/actions";
 import type { Task, TeamMember, TaskStatus } from "@/lib/types";
 
 const STATUS_ORDER: TaskStatus[] = ["pendiente", "en_progreso", "bloqueada", "recurrente", "hecha"];
@@ -49,6 +49,8 @@ export function TaskBoard({
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<"lista" | "kanban">("lista");
   const [openTask, setOpenTask] = useState<Task | null>(null);
+  const [noteDraft, setNoteDraft] = useState("");
+  const [noteSaved, setNoteSaved] = useState(false);
   // Filtros locales: los datos ya están cargados, no hace falta otro viaje.
   const [priorityFilter, setPriorityFilter] = useState("todas");
   const [areaFilter, setAreaFilter] = useState("todas");
@@ -112,6 +114,26 @@ export function TaskBoard({
       (priorityFilter === "todas" || t.priority === priorityFilter) &&
       (areaFilter === "todas" || t.area === areaFilter)
   );
+
+  function openDetail(task: Task) {
+    setOpenTask(task);
+    setNoteDraft(task.description ?? "");
+    setNoteSaved(false);
+  }
+
+  function saveNote() {
+    if (!openTask) return;
+    const form = new FormData();
+    form.set("id", openTask.id);
+    form.set("description", noteDraft);
+    startTransition(async () => {
+      const res = await updateTaskNotes(form);
+      if (res.ok) {
+        setNoteSaved(true);
+        router.refresh();
+      } else setError(res.error ?? "No se pudo guardar la nota.");
+    });
+  }
 
   function handleDrop(event: DragEvent, status: TaskStatus) {
     event.preventDefault();
@@ -230,7 +252,7 @@ export function TaskBoard({
             const overdue = task.due_date && task.due_date < today && task.status !== "hecha";
             return (
               <li key={task.id}>
-                <button type="button" onClick={() => setOpenTask(task)} className={`card flex w-full flex-wrap items-center gap-4 py-4 text-left transition hover:border-white/20 ${overdue ? "border-red-500/30" : ""}`}>
+                <button type="button" onClick={() => openDetail(task)} className={`card flex w-full flex-wrap items-center gap-4 py-4 text-left transition hover:border-white/20 ${overdue ? "border-red-500/30" : ""}`}>
                   <div className="min-w-[200px] flex-1">
                     <p className={`text-sm ${task.status === "hecha" ? "text-white/40 line-through" : "text-white"}`}>{task.title}</p>
                     <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/40">
@@ -286,7 +308,7 @@ export function TaskBoard({
                           type="button"
                           draggable
                           onDragStart={(e) => e.dataTransfer.setData("text/task-id", task.id)}
-                          onClick={() => setOpenTask(task)}
+                          onClick={() => openDetail(task)}
                           className={`w-full cursor-grab rounded-xl border border-white/5 bg-stride-card p-3 text-left text-sm transition hover:border-white/20 active:cursor-grabbing ${overdue ? "border-red-500/30" : ""}`}
                         >
                           <p className={task.status === "hecha" ? "text-white/40 line-through" : "text-white"}>{task.title}</p>
@@ -320,7 +342,28 @@ export function TaskBoard({
               </button>
             </div>
 
-            {openTask.description && <p className="mt-3 text-sm leading-relaxed text-white/60">{openTask.description}</p>}
+            <div className="mt-4">
+              <label htmlFor="task-notes" className="label">Notas</label>
+              <textarea
+                id="task-notes"
+                rows={3}
+                value={noteDraft}
+                onChange={(e) => { setNoteDraft(e.target.value); setNoteSaved(false); }}
+                className="input resize-y text-sm"
+                placeholder="Contexto, avances, links…"
+              />
+              <div className="mt-2 flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={saveNote}
+                  disabled={pending || noteDraft === (openTask.description ?? "")}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-white/15 px-4 py-1.5 text-xs font-semibold text-white/70 hover:text-white disabled:opacity-40"
+                >
+                  {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />} Guardar nota
+                </button>
+                {noteSaved && <span className="text-xs text-emerald-300">Guardada ✓</span>}
+              </div>
+            </div>
 
             <dl className="mt-5 space-y-2.5 text-sm">
               <div className="flex items-center gap-2.5"><UserRound className="h-4 w-4 shrink-0 text-white/30" /><dt className="text-white/40">Responsable</dt><dd className="font-semibold text-white">{nameOf(openTask)}</dd></div>

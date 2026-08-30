@@ -5,6 +5,7 @@ import { requireTeamMember } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { PlanForm } from "@/components/admin/PlanForm";
 import { PlanStructureEditor } from "@/components/admin/PlanStructureEditor";
+import { ExportPlanButton } from "@/components/admin/ExportPlanButton";
 import type { StrideEvent, EventPlan, Route, TeamMember } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -74,6 +75,8 @@ export default async function PlanificacionPage({
         routes={(routesData ?? []) as Route[]}
         team={(teamData ?? []) as TeamMember[]}
       />
+
+      <ExportPlanButton eventId={event.id} />
 
       <PlanStructureEditor
         eventId={event.id}

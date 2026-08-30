@@ -164,3 +164,42 @@ export async function createFolder(parentId: string, name: string): Promise<Driv
   if (!response.ok) throw new Error(`Drive respondió ${response.status}`);
   return toFile((await response.json()) as Record<string, unknown>);
 }
+
+/**
+ * Sube HTML convirtiéndolo a Documento de Google (mimeType de destino
+ * google-apps.document): así la planificación exportada queda editable en
+ * Drive, no como archivo muerto.
+ */
+export async function uploadAsGoogleDoc(folderId: string, name: string, html: string): Promise<DriveFile> {
+  const token = await accessToken();
+  const boundary = `stride-doc-${Date.now()}`;
+  const metadata = JSON.stringify({
+    name,
+    parents: [folderId],
+    mimeType: "application/vnd.google-apps.document",
+  });
+  const body = Buffer.concat([
+    Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n--${boundary}\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n`),
+    Buffer.from(html),
+    Buffer.from(`\r\n--${boundary}--`),
+  ]);
+  const response = await fetch(
+    `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=${FIELDS}&supportsAllDrives=true`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": `multipart/related; boundary=${boundary}` },
+      body,
+    }
+  );
+  if (!response.ok) throw new Error(`Drive rechazó el documento (${response.status})`);
+  return toFile((await response.json()) as Record<string, unknown>);
+}
+
+/** Busca (o crea) una subcarpeta por nombre dentro de la raíz TEAM STRIDE. */
+export async function ensureRootFolder(name: string): Promise<string> {
+  const files = await listFolder();
+  const existing = files.find((f) => f.isFolder && f.name.trim().toLowerCase() === name.toLowerCase());
+  if (existing) return existing.id;
+  const created = await createFolder(ROOT_FOLDER(), name);
+  return created.id;
+}

@@ -83,3 +83,30 @@ export async function createTask(formData: FormData) {
   revalidatePath("/admin");
   return { ok: true };
 }
+
+const NotesSchema = z.object({
+  id: z.string().uuid(),
+  description: z.string().trim().max(3000),
+});
+
+/** Notas de la tarea: contexto, avances, links. Se editan desde el popup. */
+export async function updateTaskNotes(formData: FormData) {
+  await requireTeamMember();
+
+  const parsed = NotesSchema.safeParse({
+    id: formData.get("id"),
+    description: formData.get("description") ?? "",
+  });
+  if (!parsed.success) return { ok: false, error: "Datos inválidos" };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("tasks")
+    .update({ description: parsed.data.description || null })
+    .eq("id", parsed.data.id);
+  // RLS decide: staff edita todas; un monitor, las suyas.
+  if (error) return { ok: false, error: "No se pudo guardar la nota." };
+
+  revalidatePath("/admin/tareas");
+  return { ok: true };
+}

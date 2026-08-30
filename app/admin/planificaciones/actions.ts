@@ -212,3 +212,101 @@ export async function savePlanStructure(formData: FormData): Promise<PlanResult>
   revalidatePath("/admin/planificaciones");
   return { ok: true };
 }
+
+export interface ExportResult {
+  ok: boolean;
+  error?: string;
+  url?: string;
+}
+
+const esc = (v: string | null | undefined) =>
+  (v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+function paceLabel(sec: number): string {
+  return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")} min/km`;
+}
+
+/**
+ * Exporta la planificación completa a Drive como Documento de Google, dentro
+ * de TEAM STRIDE/Planificaciones. Reexportar crea una versión nueva con la
+ * hora en el nombre: nunca pisa la anterior.
+ */
+export async function exportPlanToDrive(formData: FormData): Promise<ExportResult> {
+  await requireTeamMember(["socio", "lider_comunidad"]);
+
+  const eventId = z.string().uuid().safeParse(formData.get("event_id"));
+  if (!eventId.success) return { ok: false, error: "Evento inválido" };
+
+  const { driveConfigured, ensureRootFolder, uploadAsGoogleDoc } = await import("@/lib/google-drive");
+  if (!driveConfigured()) return { ok: false, error: "Drive no está configurado en este entorno." };
+
+  const supabase = await createClient();
+  const [{ data: event }, { data: plan }, { data: team }] = await Promise.all([
+    supabase.from("events").select("*").eq("id", eventId.data).single(),
+    supabase.from("event_plans").select("*").eq("event_id", eventId.data).maybeSingle(),
+    supabase.from("team_members").select("id, full_name, nickname"),
+  ]);
+  if (!event) return { ok: false, error: "Evento no encontrado." };
+  if (!plan) return { ok: false, error: "Guarda la planificación antes de exportar." };
+
+  const [{ data: blocks }, { data: groups }, { data: checklist }, { data: route }] = await Promise.all([
+    supabase.from("plan_blocks").select("*").eq("plan_id", plan.id).order("sort_order"),
+    supabase.from("plan_pace_groups").select("*").eq("plan_id", plan.id).order("sort_order"),
+    supabase.from("plan_checklist_items").select("*").eq("plan_id", plan.id).order("sort_order"),
+    plan.route_id
+      ? supabase.from("routes").select("name, distance_km, external_url").eq("id", plan.route_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+
+  const person = (id: string | null) => {
+    const p = (team ?? []).find((t) => t.id === id);
+    return p ? (p.nickname ?? p.full_name) : "—";
+  };
+  const dateCl = event.event_date.split("-").reverse().join("/");
+  const baseTime = (plan.meeting_time ?? event.event_time ?? "").slice(0, 5);
+
+  const blockTable = (section: string, title: string) => {
+    const rows = (blocks ?? []).filter((b) => b.section === section);
+    if (!rows.length) return "";
+    return `<h2>${title}</h2><table border="1"><tr><th>Hora</th><th>Encargado</th><th>Actividad</th><th>Notas</th></tr>${rows
+      .map((b) => `<tr><td>${esc(b.block_time?.slice(0, 5))}</td><td>${esc(b.leader_label)}</td><td>${esc(b.activity)}</td><td>${esc(b.notes)}</td></tr>`)
+      .join("")}</table>`;
+  };
+
+  const groupsTable = (groups ?? []).length
+    ? `<h2>Desarrollo — grupos y salidas</h2><table border="1"><tr><th>Grupo</th><th>Distancia</th><th>Pace</th><th>Descanso</th><th>Líderes</th><th>Salida</th></tr>${(groups ?? [])
+        .map((g) => `<tr><td>${esc(g.name)}</td><td>${g.distance_km} km</td><td>${paceLabel(g.pace_sec_per_km)}</td><td>${g.break_min} min</td><td>${esc(g.leaders)}</td><td>${g.start_offset_min === 0 ? "1ª salida" : `+${g.start_offset_min} min`}</td></tr>`)
+        .join("")}</table>`
+    : "";
+
+  const checklistHtml = (checklist ?? []).length
+    ? `<h2>Checklist</h2><ul>${(checklist ?? []).map((c) => `<li>${c.done ? "☑" : "☐"} ${esc(c.label)}</li>`).join("")}</ul>`
+    : "";
+
+  const html = `
+<h1>STRIDE — Planificación Social Run</h1>
+<table border="1">
+<tr><td><b>Evento</b></td><td>${esc(event.title)}</td><td><b>Fecha</b></td><td>${dateCl}${baseTime ? ` · ${baseTime} hrs` : ""}</td></tr>
+<tr><td><b>Punto de encuentro</b></td><td>${esc(event.meeting_point)}</td><td><b>Ruta</b></td><td>${esc(route?.name)}${route?.distance_km ? ` (${route.distance_km} km)` : ""}</td></tr>
+<tr><td><b>Planificación</b></td><td>${esc(person(plan.planner_id))}</td><td><b>Ruta a cargo de</b></td><td>${esc(person(plan.route_owner_id))}</td></tr>
+<tr><td><b>Lidera</b></td><td>${esc(person(plan.lead_id))}</td><td><b>Cierra / Fotos</b></td><td>${esc(person(plan.sweeper_id))} / ${esc(person(plan.photographer_id))}</td></tr>
+</table>
+${blockTable("inicio", "Inicio")}
+${groupsTable}
+${blockTable("final", "Final running")}
+${blockTable("social", "Espacio social")}
+${plan.materials ? `<h2>Materiales</h2><p>${esc(plan.materials)}</p>` : ""}
+${plan.sponsor_notes ? `<h2>Colaborador</h2><p>${esc(plan.sponsor_notes)}</p>` : ""}
+${plan.contingency ? `<h2>Plan B</h2><p>${esc(plan.contingency)}</p>` : ""}
+${checklistHtml}
+<p><i>Exportado desde el ERP STRIDE.</i></p>`;
+
+  try {
+    const folder = await ensureRootFolder("Planificaciones");
+    const stamp = new Date().toLocaleString("es-CL", { timeZone: "America/Santiago", hour12: false }).replace(/[/:]/g, "-").replace(", ", " ");
+    const doc = await uploadAsGoogleDoc(folder, `Planificación — ${event.title} — ${dateCl} (${stamp})`, html);
+    return { ok: true, url: doc.webViewLink };
+  } catch {
+    return { ok: false, error: "Drive rechazó el documento. Intenta de nuevo." };
+  }
+}

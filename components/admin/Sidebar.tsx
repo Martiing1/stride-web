@@ -158,11 +158,13 @@ export function Sidebar({
         <div className="border-b border-white/5 bg-stride-bg lg:hidden">{nav(true)}</div>
       )}
 
-      {/* Escritorio: riel plegado que se expande al pasar el mouse */}
-      <aside className="relative hidden w-[72px] shrink-0 lg:block">
-        <div className="group absolute inset-y-0 left-0 z-40 w-[72px] overflow-hidden border-r border-white/5 bg-stride-bg transition-[width] duration-200 ease-out hover:w-64 hover:shadow-[8px_0_24px_rgba(0,0,0,.45)]">
-          <div className="hidden w-64 group-hover:block">{nav(true)}</div>
-          <div className="w-[72px] group-hover:hidden">{nav(false)}</div>
+      {/* Escritorio: riel plegado, pegado a la ventana, que se expande al pasar el mouse */}
+      <aside className="hidden w-[72px] shrink-0 lg:block">
+        <div className="sticky top-0 h-screen">
+          <div className="group absolute inset-y-0 left-0 z-40 w-[72px] overflow-hidden border-r border-white/5 bg-stride-bg transition-[width] duration-200 ease-out hover:w-64 hover:shadow-[8px_0_24px_rgba(0,0,0,.45)]">
+            <div className="hidden h-full w-64 group-hover:block">{nav(true)}</div>
+            <div className="h-full w-[72px] group-hover:hidden">{nav(false)}</div>
+          </div>
         </div>
       </aside>
     </>

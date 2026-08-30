@@ -7,6 +7,16 @@ import { createClient } from "@/lib/supabase/server";
 import { parseActa, resolveAssignee } from "@/lib/acta-parser";
 import type { TeamMember } from "@/lib/types";
 
+const TaskOverrideSchema = z.array(
+  z.object({
+    title: z.string().trim().min(3).max(300),
+    assigneeLabel: z.string().trim().max(120),
+    dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+    priority: z.enum(["alta", "media", "baja"]),
+    area: z.string().trim().max(80),
+  })
+).max(50);
+
 const ActaSchema = z.object({
   title: z.string().trim().min(3, "Ponle un título al acta").max(200),
   meeting_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida"),
@@ -45,6 +55,27 @@ export async function saveActa(formData: FormData): Promise<SaveActaResult> {
 
   const { title, meeting_date, attendees, content } = parsed.data;
   const acta = parseActa(content);
+
+  // Las tareas pueden venir corregidas desde la previsualización (fechas
+  // "A definir", responsables, prioridades). Si llegan, mandan ellas.
+  const overrideRaw = formData.get("tasks_override");
+  if (typeof overrideRaw === "string" && overrideRaw) {
+    try {
+      const override = TaskOverrideSchema.safeParse(JSON.parse(overrideRaw));
+      if (override.success) {
+        acta.tasks = override.data.map((t) => ({
+          actaCode: acta.actaCode ?? "",
+          assigneeLabel: t.assigneeLabel || "Sin asignar",
+          dueDate: t.dueDate,
+          priority: t.priority,
+          area: t.area || "general",
+          title: t.title,
+        }));
+      }
+    } catch {
+      /* JSON malo: se usan las parseadas tal cual */
+    }
+  }
   const supabase = await createClient();
 
   const { data: meeting, error: meetingError } = await supabase

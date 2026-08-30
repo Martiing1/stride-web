@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, CheckCircle2, AlertTriangle, ListTodo, Gavel, Eye } from "lucide-react";
-import { parseActa } from "@/lib/acta-parser";
+import { parseActa, type ParsedTask } from "@/lib/acta-parser";
 import { saveActa, type SaveActaResult } from "@/app/admin/actas/actions";
 
 /**
@@ -23,10 +23,14 @@ export function ActaUploader() {
   const [result, setResult] = useState<SaveActaResult | null>(null);
 
   const preview = useMemo(() => (content.trim() ? parseActa(content) : null), [content]);
+  // Copia editable de las tareas: acá se corrigen fechas "A definir",
+  // responsables y prioridades antes de crear nada.
+  const [tasks, setTasks] = useState<ParsedTask[]>([]);
 
   // El acta trae su propio encabezado: al pegarla, los campos vacíos se
   // completan solos y cualquier corrección manual del usuario se respeta.
   useEffect(() => {
+    setTasks(preview?.tasks ?? []);
     const header = preview?.header;
     if (!header) return;
     if (header.titleSuggestion) setTitle((v) => v || header.titleSuggestion!);
@@ -39,7 +43,9 @@ export function ActaUploader() {
     setSaving(true);
     setResult(null);
 
-    const res = await saveActa(new FormData(event.currentTarget));
+    const form = new FormData(event.currentTarget);
+    if (tasks.length > 0) form.set("tasks_override", JSON.stringify(tasks));
+    const res = await saveActa(form);
     setResult(res);
     setSaving(false);
 
@@ -183,7 +189,7 @@ export function ActaUploader() {
             <div className="space-y-4">
               <div className="grid grid-cols-3 gap-2 text-center">
                 {[
-                  { n: preview.tasks.length, label: "Tareas" },
+                  { n: tasks.length, label: "Tareas" },
                   { n: preview.decisions.length, label: "Decisiones" },
                   { n: preview.followups.length, label: "Seguim." },
                 ].map((s) => (
@@ -198,22 +204,62 @@ export function ActaUploader() {
                 <p className="font-mono text-[11px] text-white/35">{preview.actaCode}</p>
               )}
 
-              {preview.tasks.length > 0 && (
+              {tasks.length > 0 && (
                 <div>
                   <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-white/60">
-                    <ListTodo className="h-3.5 w-3.5" /> Tareas
+                    <ListTodo className="h-3.5 w-3.5" /> Tareas — edítalas antes de guardar
                   </p>
                   <ul className="space-y-2">
-                    {preview.tasks.map((t, i) => (
-                      <li key={i} className="rounded-lg bg-white/5 p-2.5">
-                        <p className="text-xs leading-snug text-white/85">{t.title}</p>
-                        <p className="mt-1 text-[10px] text-white/40">
-                          {t.assigneeLabel} · {t.area}
-                          {t.dueDate && ` · ${t.dueDate.split("-").reverse().join("/")}`} ·{" "}
-                          {t.priority}
-                        </p>
-                      </li>
-                    ))}
+                    {tasks.map((t, i) => {
+                      const patch = (changes: Partial<ParsedTask>) =>
+                        setTasks(tasks.map((x, j) => (j === i ? { ...x, ...changes } : x)));
+                      return (
+                        <li key={i} className="space-y-1.5 rounded-lg bg-white/5 p-2.5">
+                          <textarea
+                            value={t.title}
+                            onChange={(e) => patch({ title: e.target.value })}
+                            rows={2}
+                            className="w-full resize-none rounded-md border border-transparent bg-transparent text-xs leading-snug text-white/85 focus:border-white/20 focus:outline-none"
+                          />
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <input
+                              value={t.assigneeLabel}
+                              onChange={(e) => patch({ assigneeLabel: e.target.value })}
+                              className="input px-2 py-1 text-[11px]"
+                              placeholder="Responsable"
+                              aria-label="Responsable"
+                            />
+                            <input
+                              type="date"
+                              value={t.dueDate ?? ""}
+                              onChange={(e) => patch({ dueDate: e.target.value || null })}
+                              className={`input px-2 py-1 text-[11px] ${t.dueDate ? "" : "border-amber-400/40"}`}
+                              aria-label="Fecha límite"
+                            />
+                            <select
+                              value={t.priority}
+                              onChange={(e) => patch({ priority: e.target.value as ParsedTask["priority"] })}
+                              className="input px-2 py-1 text-[11px]"
+                              aria-label="Prioridad"
+                            >
+                              <option value="alta" className="bg-stride-card">Alta</option>
+                              <option value="media" className="bg-stride-card">Media</option>
+                              <option value="baja" className="bg-stride-card">Baja</option>
+                            </select>
+                            <input
+                              value={t.area}
+                              onChange={(e) => patch({ area: e.target.value })}
+                              className="input px-2 py-1 text-[11px]"
+                              placeholder="Área"
+                              aria-label="Área"
+                            />
+                          </div>
+                          {!t.dueDate && (
+                            <p className="text-[10px] text-amber-300/80">Sin fecha (venía "A definir"): ponle una o quedará sin límite.</p>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               )}
