@@ -131,7 +131,7 @@ export default async function EventoDetailPage({
           eventId={event.id}
           status={event.status}
           isPublic={event.is_public}
-          hasEventlyUrl={Boolean(event.evently_url)}
+          eventlyUrl={event.evently_url}
           meetsMinimum={confirmation?.meets_minimum ?? false}
         />
       )}

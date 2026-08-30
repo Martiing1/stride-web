@@ -301,3 +301,40 @@ export async function fetchEventlyMetadata(formData: FormData): Promise<EventlyP
     return { ok: false, error: "No pudimos leer la página de Evently. Intenta de nuevo." };
   }
 }
+
+const EventlyUrlSchema = z.object({
+  id: z.string().uuid(),
+  evently_url: z.string().trim().url("Link inválido").max(500).or(z.literal("")),
+});
+
+/**
+ * Guarda (o corrige) el link de Evently después de creado el evento. Antes
+ * solo se podía poner al crearlo, y un evento sin link quedaba imposible de
+ * publicar sin recrearlo. Quitar el link despublica: la regla de "no mostrar
+ * nada sin inscripción" se mantiene sola.
+ */
+export async function setEventlyUrl(formData: FormData) {
+  await requireTeamMember(["socio", "lider_comunidad"]);
+
+  const parsed = EventlyUrlSchema.safeParse({
+    id: formData.get("id"),
+    evently_url: formData.get("evently_url") ?? "",
+  });
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Link inválido" };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("events")
+    .update({
+      evently_url: parsed.data.evently_url || null,
+      ...(parsed.data.evently_url ? {} : { is_public: false }),
+    })
+    .eq("id", parsed.data.id);
+  if (error) return { ok: false, error: "No se pudo guardar el link." };
+
+  revalidatePath(`/admin/eventos/${parsed.data.id}`);
+  revalidatePath("/admin/eventos");
+  revalidatePath("/eventos");
+  revalidatePath("/");
+  return { ok: true };
+}
