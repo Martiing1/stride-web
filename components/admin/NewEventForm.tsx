@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Loader2, X } from "lucide-react";
-import { createEvent } from "@/app/admin/eventos/actions";
+import { Plus, Loader2, X, Wand2 } from "lucide-react";
+import { createEvent, fetchEventlyMetadata } from "@/app/admin/eventos/actions";
 
 const TYPES = [
   { value: "social_run", label: "Social Run" },
@@ -20,6 +20,33 @@ export function NewEventForm() {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [eventlyUrl, setEventlyUrl] = useState("");
+  const [title, setTitle] = useState("");
+  const [eventDate, setEventDate] = useState("");
+  const [eventTime, setEventTime] = useState("");
+  const [meetingPoint, setMeetingPoint] = useState("");
+  const [fetchNote, setFetchNote] = useState<string | null>(null);
+  const [fetching, startFetching] = useTransition();
+
+  /** Lee la página pública de Evently y rellena lo que venga (sin pisar lo escrito). */
+  function autofill() {
+    const form = new FormData();
+    form.set("url", eventlyUrl);
+    setFetchNote(null);
+    startFetching(async () => {
+      const result = await fetchEventlyMetadata(form);
+      if (!result.ok || !result.event) {
+        setFetchNote(result.error ?? "No se pudo leer el evento.");
+        return;
+      }
+      const e = result.event;
+      if (e.title) setTitle((v) => v || e.title!);
+      if (e.eventDate) setEventDate((v) => v || e.eventDate!);
+      if (e.eventTime) setEventTime((v) => v || e.eventTime!);
+      if (e.meetingPoint) setMeetingPoint((v) => v || e.meetingPoint!);
+      setFetchNote("Datos cargados desde Evently. Cupos y punto de partida van a mano.");
+    });
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -67,7 +94,7 @@ export function NewEventForm() {
           <label className="label" htmlFor="title">
             Nombre
           </label>
-          <input id="title" name="title" required className="input" placeholder="Social Run Sunset" />
+          <input id="title" name="title" required value={title} onChange={(e) => setTitle(e.target.value)} className="input" placeholder="Social Run Sunset" />
         </div>
 
         <div>
@@ -88,13 +115,13 @@ export function NewEventForm() {
             <label className="label" htmlFor="event_date">
               Fecha
             </label>
-            <input id="event_date" name="event_date" type="date" required className="input" />
+            <input id="event_date" name="event_date" type="date" required value={eventDate} onChange={(e) => setEventDate(e.target.value)} className="input" />
           </div>
           <div>
             <label className="label" htmlFor="event_time">
               Hora
             </label>
-            <input id="event_time" name="event_time" type="time" className="input" />
+            <input id="event_time" name="event_time" type="time" value={eventTime} onChange={(e) => setEventTime(e.target.value)} className="input" />
           </div>
         </div>
 
@@ -105,6 +132,8 @@ export function NewEventForm() {
           <input
             id="meeting_point"
             name="meeting_point"
+            value={meetingPoint}
+            onChange={(e) => setMeetingPoint(e.target.value)}
             className="input"
             placeholder="Teatro Biobío"
           />
@@ -157,14 +186,29 @@ export function NewEventForm() {
           <label className="label" htmlFor="evently_url">
             Link de Evently
           </label>
-          <input
-            id="evently_url"
-            name="evently_url"
-            type="url"
-            className="input"
-            placeholder="https://evently…"
-          />
-          <p className="mt-1 text-xs text-white/35">Necesario para publicarlo en la web.</p>
+          <div className="flex gap-2">
+            <input
+              id="evently_url"
+              name="evently_url"
+              type="url"
+              value={eventlyUrl}
+              onChange={(e) => setEventlyUrl(e.target.value)}
+              className="input"
+              placeholder="https://stridechile.evently.cl/…"
+            />
+            <button
+              type="button"
+              onClick={autofill}
+              disabled={fetching || !eventlyUrl.trim()}
+              title="Leer título, fecha, hora y lugar desde Evently"
+              className="btn-secondary shrink-0 px-4 py-2 text-sm"
+            >
+              {fetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Wand2 className="h-4 w-4" /> Autocompletar</>}
+            </button>
+          </div>
+          <p className="mt-1 text-xs text-white/35">
+            {fetchNote ?? "Necesario para publicarlo en la web. Con el link puesto, «Autocompletar» trae título, fecha, hora y lugar."}
+          </p>
         </div>
 
         <div>

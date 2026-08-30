@@ -278,3 +278,26 @@ export async function importRegistrations(formData: FormData): Promise<ImportRes
     validated: records.filter((r) => r.validated_at).length,
   };
 }
+
+export interface EventlyPreviewResult {
+  ok: boolean;
+  error?: string;
+  event?: import("@/lib/evently").EventlyEvent;
+}
+
+/** Lee los metadatos públicos de un link de Evently para autocompletar el formulario. */
+export async function fetchEventlyMetadata(formData: FormData): Promise<EventlyPreviewResult> {
+  await requireTeamMember(["socio", "lider_comunidad"]);
+
+  const url = z.string().trim().url().max(500).safeParse(formData.get("url"));
+  if (!url.success) return { ok: false, error: "Pega primero el link de Evently." };
+
+  const { fetchEventlyEvent } = await import("@/lib/evently");
+  try {
+    const event = await fetchEventlyEvent(url.data);
+    if (!event) return { ok: false, error: "Ese link no parece un evento de Evently." };
+    return { ok: true, event };
+  } catch {
+    return { ok: false, error: "No pudimos leer la página de Evently. Intenta de nuevo." };
+  }
+}
