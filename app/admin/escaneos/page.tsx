@@ -1,6 +1,6 @@
 import { ScanLine, MapPin, MapPinOff } from "lucide-react";
 import { requireTeamMember } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/server";
 import { todayInChile } from "@/lib/membership";
 import type { Scan } from "@/lib/types";
 
@@ -12,7 +12,10 @@ interface ScanWithMember extends Scan {
 
 export default async function EscaneosPage() {
   await requireTeamMember(["socio", "lider_comunidad"]);
-  const supabase = await createClient();
+  // Cliente de servicio: desde la migración 003 solo el dueño lee `members`, y
+  // con la sesión normal el join devolvía null y la lista salía sin nombres.
+  // El permiso ya se verificó arriba.
+  const supabase = createServiceClient();
 
   const monthStart = `${todayInChile().slice(0, 7)}-01`;
 

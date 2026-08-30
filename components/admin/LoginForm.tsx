@@ -8,6 +8,16 @@ import { createClient } from "@/lib/supabase/client";
 type Step = "credentials" | "totp";
 
 /**
+ * Destino tras entrar. El middleware guarda en `?next` la página que se quiso
+ * abrir sin sesión; ignorarlo obligaba a navegar otra vez a mano.
+ * Se lee de `window` y no con useSearchParams para no forzar un Suspense.
+ */
+function destinationAfterLogin(): string {
+  const next = new URLSearchParams(window.location.search).get("next");
+  return next?.startsWith("/admin") && !next.startsWith("//") ? next : "/admin";
+}
+
+/**
  * Login del ERP en dos pasos: email + contraseña, y luego el código TOTP de la
  * app autenticadora.
  *
@@ -67,7 +77,7 @@ export function LoginForm() {
       return;
     }
 
-    router.replace("/admin");
+    router.replace(destinationAfterLogin());
     router.refresh();
   }
 
@@ -102,7 +112,7 @@ export function LoginForm() {
       return;
     }
 
-    router.replace("/admin");
+    router.replace(destinationAfterLogin());
     router.refresh();
   }
 

@@ -1,6 +1,6 @@
 import { TrendingUp, TrendingDown, Wallet, LineChart } from "lucide-react";
 import { requireTeamMember } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { formatCLP, SITE } from "@/lib/site";
 import { todayInChile } from "@/lib/membership";
 import { FinanceManager } from "@/components/admin/FinanceManager";
@@ -28,7 +28,9 @@ export default async function FinanzasPage() {
   const [{ data: txData }, { count: activeMembers }, { data: eventsData }, { data: summaryData }] =
     await Promise.all([
       supabase.from("transactions").select("*").order("occurred_on", { ascending: false }).limit(300),
-      supabase.from("members").select("*", { count: "exact", head: true }).eq("status", "activa"),
+      // El conteo va por el cliente de servicio: `members` es solo del dueño y
+      // con la sesión de otro socio la proyección de ingresos daba 0 sin avisar.
+      createServiceClient().from("members").select("*", { count: "exact", head: true }).eq("status", "activa"),
       supabase.from("events").select("*").order("event_date", { ascending: false }).limit(40),
       supabase.from("monthly_finance_summary").select("*").limit(12),
     ]);

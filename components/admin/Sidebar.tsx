@@ -18,6 +18,8 @@ import {
   ClipboardList,
   Map,
   CalendarCheck,
+  ShieldCheck,
+  MessageSquareQuote,
   Menu,
   X,
 } from "lucide-react";
@@ -30,6 +32,8 @@ interface NavItem {
   icon: typeof LayoutDashboard;
   /** Roles que ven el link. Si se omite, lo ve todo el equipo. */
   roles?: Role[];
+  /** Solo para el dueño: la página lo exige, así que no se ofrece a nadie más. */
+  ownerOnly?: boolean;
 }
 
 const NAV: { section: string; items: NavItem[] }[] = [
@@ -54,10 +58,11 @@ const NAV: { section: string; items: NavItem[] }[] = [
     section: "Membresía",
     items: [
       { href: "/admin/membresia", label: "Plan del mes", icon: CalendarCheck, roles: ["socio", "lider_comunidad"] },
-      { href: "/admin/miembros", label: "Miembros", icon: IdCard, roles: ["socio", "lider_comunidad"] },
+      { href: "/admin/miembros", label: "Miembros", icon: IdCard, roles: ["socio", "lider_comunidad"], ownerOnly: true },
       { href: "/admin/escaneos", label: "Escaneos", icon: ScanLine, roles: ["socio", "lider_comunidad"] },
       { href: "/admin/convenios", label: "Convenios", icon: HeartHandshake, roles: ["socio", "lider_comunidad"] },
       { href: "/admin/leads", label: "Leads", icon: UserPlus, roles: ["socio", "lider_comunidad"] },
+      { href: "/admin/testimonios", label: "Testimonios", icon: MessageSquareQuote, roles: ["socio", "lider_comunidad"] },
     ],
   },
   {
@@ -65,6 +70,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
     items: [
       { href: "/admin/kits", label: "Kits e inventario", icon: Package },
       { href: "/admin/finanzas", label: "Finanzas", icon: Wallet, roles: ["socio"] },
+      { href: "/admin/seguridad", label: "Seguridad", icon: ShieldCheck },
     ],
   },
 ];
@@ -72,10 +78,12 @@ const NAV: { section: string; items: NavItem[] }[] = [
 export function Sidebar({
   role,
   name,
+  isOwner,
   onSignOut,
 }: {
   role: Role;
   name: string;
+  isOwner: boolean;
   onSignOut: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -93,7 +101,9 @@ export function Sidebar({
 
       <div className="flex-1 space-y-6">
         {NAV.map((group) => {
-          const items = group.items.filter((i) => !i.roles || i.roles.includes(role));
+          const items = group.items.filter(
+            (i) => (!i.roles || i.roles.includes(role)) && (!i.ownerOnly || isOwner)
+          );
           if (items.length === 0) return null;
 
           return (

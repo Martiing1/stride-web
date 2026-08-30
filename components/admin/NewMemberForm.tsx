@@ -45,7 +45,7 @@ export function NewMemberForm() {
         <div>
           <h2 className="font-heading text-lg font-bold text-white">Nuevo miembro</h2>
           <p className="text-sm text-white/45">
-            Al guardar se genera su código QR y el link privado de su tarjeta.
+            Se crea su ficha. La invitación se envía después, cuando tú decidas.
           </p>
         </div>
         <button
@@ -70,7 +70,7 @@ export function NewMemberForm() {
           <label className="label" htmlFor="email">
             Email
           </label>
-          <input id="email" name="email" type="email" className="input" />
+          <input id="email" name="email" type="email" required className="input" />
         </div>
 
         <div>
@@ -81,34 +81,11 @@ export function NewMemberForm() {
         </div>
 
         <div>
-          <label className="label" htmlFor="skool_handle">
-            Usuario en Skool
-          </label>
-          <input id="skool_handle" name="skool_handle" className="input" />
-        </div>
-
-        <div>
           <label className="label" htmlFor="valid_until">
             Vigente hasta
           </label>
           <input id="valid_until" name="valid_until" type="date" className="input" />
           <p className="mt-1 text-xs text-white/35">Vacío = sin vencimiento.</p>
-        </div>
-
-        <div className="sm:col-span-2">
-          <label className="label" htmlFor="photo_url">
-            URL de la foto
-          </label>
-          <input
-            id="photo_url"
-            name="photo_url"
-            type="url"
-            className="input"
-            placeholder="https://…"
-          />
-          <p className="mt-1 text-xs text-white/35">
-            Aparece en su tarjeta y en la pantalla de validación del comercio.
-          </p>
         </div>
 
         <div>

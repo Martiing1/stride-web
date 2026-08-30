@@ -1,4 +1,4 @@
-import { requireTeamMember } from "@/lib/auth";
+import { requireTeamMember, isCurrentUserOwner } from "@/lib/auth";
 import { Sidebar } from "@/components/admin/Sidebar";
 import { SignOutButton } from "@/components/admin/SignOutButton";
 import { headers } from "next/headers";
@@ -26,12 +26,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   const member = await requireTeamMember();
+  const isOwner = await isCurrentUserOwner();
 
   return (
     <div className="flex min-h-dvh flex-col bg-stride-bg lg:flex-row">
       <Sidebar
         role={member.role}
         name={member.nickname ?? member.full_name}
+        isOwner={isOwner}
         onSignOut={<SignOutButton />}
       />
       <div className="min-w-0 flex-1">

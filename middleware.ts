@@ -65,7 +65,12 @@ export async function middleware(request: NextRequest) {
       login.pathname = "/admin/login";
       return NextResponse.redirect(login);
     }
-    return NextResponse.rewrite(rewritten);
+
+    // El layout del ERP decide con esta cabecera si la ruta exige sesión. Tiene
+    // que llevar la ruta YA reescrita: en este host el pathname original es
+    // /activar, no /admin/activar, y sin esto la activación pide login.
+    requestHeaders.set("x-stride-pathname", rewritten.pathname);
+    return NextResponse.rewrite(rewritten, { request: { headers: requestHeaders } });
   }
 
   // --- Acceso directo a /admin en el dominio principal ---
@@ -80,12 +85,22 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(login);
   }
 
-  // Ya autenticado y entrando al login: al dashboard.
+  // Una sesión de miembro no cuenta como acceso al ERP. Solo se salta el
+  // login si la cuenta autenticada pertenece realmente al equipo.
   if (isLoginRoute && user) {
-    const dashboard = url.clone();
-    dashboard.pathname = "/admin";
-    dashboard.search = "";
-    return NextResponse.redirect(dashboard);
+    const { data: teamMember } = await supabase
+      .from("team_members")
+      .select("id")
+      .eq("auth_user_id", user.id)
+      .eq("status", "activo")
+      .maybeSingle();
+
+    if (teamMember) {
+      const dashboard = url.clone();
+      dashboard.pathname = "/admin";
+      dashboard.search = "";
+      return NextResponse.redirect(dashboard);
+    }
   }
 
   return response;

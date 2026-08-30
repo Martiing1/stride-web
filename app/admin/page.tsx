@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { ListTodo, IdCard, ScanLine, UserPlus, AlertTriangle, ArrowRight } from "lucide-react";
-import { requireTeamMember, isStaff } from "@/lib/auth";
+import { ListTodo, IdCard, ScanLine, UserPlus, AlertTriangle, ArrowRight, ShieldAlert, Lock } from "lucide-react";
+import { requireTeamMember, isStaff, isCurrentUserOwner } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { todayInChile } from "@/lib/membership";
 
@@ -15,12 +15,24 @@ async function count(
   return n ?? 0;
 }
 
-export default async function AdminDashboard() {
+export default async function AdminDashboard({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
   const member = await requireTeamMember();
   const supabase = await createClient();
   const today = todayInChile();
 
+  const { error: pageError } = await searchParams;
   const staff = isStaff(member.role);
+  const isOwner = await isCurrentUserOwner();
+
+  // Un rebote silencioso desde una página sin permiso parece un bug del sistema.
+  const deniedAccess = pageError === "sin-permiso";
+
+  const { data: { user: authUser } } = await supabase.auth.getUser();
+  const hasSecondFactor = (authUser?.factors ?? []).some((f) => f.status === "verified");
 
   const [myOpenTasks, overdueTasks, activeMembers, newLeads, scansThisMonth] = await Promise.all([
     count(supabase, "tasks", (q) =>
@@ -56,7 +68,10 @@ export default async function AdminDashboard() {
     { label: "Tareas vencidas", value: overdueTasks, icon: AlertTriangle, href: "/admin/tareas", alert: overdueTasks > 0 },
     ...(staff
       ? [
-          { label: "Miembros activos", value: activeMembers, icon: IdCard, href: "/admin/miembros" },
+          // La ficha de miembros es solo del dueño: al resto no se le ofrece un link que rebota.
+          ...(isOwner
+            ? [{ label: "Miembros activos", value: activeMembers, icon: IdCard, href: "/admin/miembros" }]
+            : []),
           { label: "Leads sin contactar", value: newLeads, icon: UserPlus, href: "/admin/leads" },
           { label: "Escaneos este mes", value: scansThisMonth, icon: ScanLine, href: "/admin/escaneos" },
         ]
@@ -65,6 +80,24 @@ export default async function AdminDashboard() {
 
   return (
     <div className="space-y-10">
+      {deniedAccess && (
+        <p className="flex items-start gap-3 rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-100">
+          <Lock className="mt-0.5 h-4 w-4 shrink-0" />
+          Esa sección no está disponible para tu rol, así que te trajimos de vuelta al inicio.
+        </p>
+      )}
+
+      {!hasSecondFactor && (
+        <Link href="/admin/seguridad" className="flex items-start gap-3 rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-100 transition hover:border-amber-300/50">
+          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            <strong className="font-semibold">Tu cuenta entra solo con contraseña.</strong>{" "}
+            Activa el segundo factor para proteger los datos de miembros y finanzas.
+            <ArrowRight className="ml-1 inline h-3.5 w-3.5" />
+          </span>
+        </Link>
+      )}
+
       <header>
         <h1 className="font-heading text-3xl font-extrabold text-white">
           Hola, {member.nickname ?? member.full_name.split(" ")[0]}

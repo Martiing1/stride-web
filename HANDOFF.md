@@ -1,6 +1,6 @@
 # STRIDE — Estado del proyecto
 
-> Documento de traspaso. Actualizado: **2026-08-27**, tras el lanzamiento a producción.
+> Documento de traspaso. Actualizado: **2026-08-30**, tras la auditoría completa.
 > Lee también `README.md` (setup, marca, posicionamiento).
 
 ---
@@ -33,15 +33,24 @@ Un solo proyecto sirve el sitio público y el ERP: `middleware.ts` detecta el ho
 | `/` | Hero con foto real, agenda de encuentros, cómo funciona, STRIDE ONE, testimonios, captura |
 | `/one` | Membresía, 4 pilares, catálogo de convenios |
 | `/eventos` | Agenda de Social Runs con link de Evently por evento |
-| `/tarjeta/[token]` | Tarjeta virtual del miembro con QR (link privado) |
-| `/validar/[code]` | Verificación pública para comercios + registro de escaneo con geo |
+| `/miembros` | Carnet digital del miembro: QR rotativo, beneficios, foto (PWA instalable) |
+| `/miembros/ingresar` | Acceso del miembro con código por email, sin contraseña |
+| `/auth/callback` | Llegada de los enlaces de acceso: `token_hash`, PKCE o flujo implícito |
+| `/auth/enlace` | Cierra el flujo implícito leyendo la sesión del fragmento de la URL |
+| `/validar/qr` | Verificación del QR rotativo + registro del escaneo con geo |
+| `/validar/[code]` | Verificación por código fijo (flujo anterior, sigue vivo) |
+| `/tarjeta/[token]` | Redirige a `/miembros/ingresar`: el link privado quedó reemplazado |
 
 ### ERP — cuatro secciones
 
 **Operaciones:** Dashboard · Tareas · Actas · Equipo
 **Social Run:** Eventos · Planificaciones · Rutas
-**Membresía:** Plan del mes · Miembros · Escaneos · Convenios · Leads
-**Recursos:** Kits e inventario · Finanzas
+**Membresía:** Plan del mes · Miembros · Escaneos · Convenios · Leads · Testimonios
+**Recursos:** Kits e inventario · Finanzas · Seguridad
+
+Todas las secciones son de escritura. Convenios, Testimonios y Kits se editan
+desde el ERP: ya no hay que entrar a Supabase para cambiar un descuento, publicar
+un testimonio ni ajustar stock.
 
 Login con email + contraseña + **TOTP**. Roles: `socio` / `lider_comunidad` / `monitor`.
 Permisos en dos capas: `requireTeamMember()` en cada página **y** políticas RLS en
@@ -54,11 +63,12 @@ Postgres. Si alguien saltara la primera, la base rechaza la consulta igual.
 ### Supabase
 
 - Proyecto `stride` — ref `onljegsllbkvqbkeqbtt`, org `martin's projects`.
-- Migraciones aplicadas: `schema.sql`, `seed.sql`, `migration-002-erp.sql`.
+- Migraciones aplicadas: `schema.sql`, `seed.sql`, `migration-002-erp.sql`,
+  `migration-003-member-portal.sql` (verificada en la base el 30-08-2026).
 - `lead-consent-migration.sql` — aplicar solo si `schema.sql` se corrió antes
   del 27-08-2026 (agrega columnas de consentimiento a `leads`).
-- Buckets de Storage: `rutas` (público, para los GPX) y `comprobantes`
-  (privado, se abre con URL firmada de 60 s).
+- Buckets de Storage: `rutas` (público, para los GPX), `comprobantes` (privado,
+  URL firmada de 60 s) y `member-photos` (privado, URL firmada de 300 s).
 - La tabla `fincore_leads` pertenece a otro proyecto. **No tocar.**
 - Las claves viven en `.env.local` y en Vercel. Nunca en el repo.
 
@@ -94,7 +104,42 @@ nueva para el registro A, pero `76.76.21.21` funciona.
 
 ## Qué falta
 
-### 1. Accesos
+### 1. Configuración en Supabase (pendiente, hay que hacerla a mano)
+
+Estas tres cosas no se pueden tocar desde el repo y son las que sostienen el
+acceso de los miembros:
+
+**a. Plantilla del correo de acceso.** Authentication → Emails → *Magic Link*.
+La plantilla por defecto trae solo el enlace, y ese enlace arrastra el flujo con
+el que se pidió. Reemplázala por esta, que además manda el código:
+
+```html
+<h2>Tu carnet STRIDE ONE</h2>
+<p><a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=magiclink&next=/miembros">Abrir mi carnet</a></p>
+<p>O escribe este código en stridechile.cl/miembros/ingresar:</p>
+<p style="font-size:28px;letter-spacing:6px"><strong>{{ .Token }}</strong></p>
+```
+
+`{{ .TokenHash }}` es la pieza clave: abre en cualquier dispositivo, a diferencia
+del enlace por defecto. `{{ .Token }}` es el código de respaldo.
+
+**b. Lista blanca de redirecciones.** Authentication → URL Configuration →
+*Redirect URLs*. Tienen que estar:
+
+```
+https://stridechile.cl/auth/callback
+https://stridechile.cl/**
+http://localhost:3000/**
+```
+
+Sin esto Supabase ignora el `redirect_to` y manda el enlace al Site URL.
+
+**c. SMTP propio.** El correo de cortesía de Supabase entrega **2 mensajes por
+hora** y a veces no llega. Con `RESEND_API_KEY` en el entorno, el ERP manda la
+invitación por su cuenta, con enlace de `token_hash` y código: sin la clave cae
+al correo de Supabase y su tope.
+
+### 2. Accesos
 
 - **Los 7 emails del equipo siguen como `PENDIENTE-`** en `team_members`. La
   planilla original de Drive traía placeholders duplicados (`vale@stride.cl` en
@@ -102,35 +147,33 @@ nueva para el registro A, pero `76.76.21.21` funciona.
   no pueden entrar.
 - **Juanjo no tiene acceso.** Falta crear su usuario con `juanjofloressv@gmail.com`
   y enlazar el UID.
+- **Nadie tiene segundo factor inscrito.** Hoy el ERP entra solo con contraseña.
+  La pantalla para activarlo ya existe: **/admin/seguridad**. El dashboard avisa
+  mientras la cuenta no lo tenga.
 
 Para dar acceso a alguien:
 
 ```
 1. Supabase → Authentication → Users → crear usuario
 2. Copiar el User UID → pegarlo en team_members.auth_user_id de su fila
-3. En el primer login, esa persona inscribe su app autenticadora (TOTP)
+3. Esa persona entra y activa su TOTP en /admin/seguridad
 ```
 
 > **Ojo con los correos de recuperación:** Gmail pre-abre los links al escanearlos
 > y consume el token (`otp_expired`). Para 2-3 personas es más rápido definir la
 > contraseña directo desde el panel de Supabase.
 
-### 2. Contenido real
+### 3. Contenido real
 
 | Qué | Dónde | Detalle |
 |---|---|---|
-| Descuentos de convenios | tabla `benefits` | Los 6 nombres son correctos; las condiciones dicen "Tarifa preferente" genérico |
-| Testimonios | tabla `testimonials` | Cargados con `published = false` y texto de relleno |
-| Eventos reales | tabla `events` | Postergados a propósito hasta probar el módulo admin |
-| Resend | `.env` | No configurado. Los leads se guardan igual, pero no llega aviso por correo |
+| Descuentos de convenios | ERP → Convenios | Los 6 nombres son correctos; las condiciones dicen "Tarifa preferente" genérico |
+| Testimonios | ERP → Testimonios | Hay 4 con texto de relleno y sin publicar |
+| Eventos reales | ERP → Eventos | Los 3 cargados son de abril, sin link de Evently y con `is_public = false` |
+| Resend | `.env` | Sin configurar: no llega aviso de leads ni salen las invitaciones por nuestro remitente |
 
-### 3. Módulos incompletos
-
-- **Kits e inventario es la única sección solo-lectura.** Falta CRUD de
-  artículos y registro de entregas.
-- **Convenios y testimonios no se editan desde el ERP** — hoy hay que entrar a
-  Supabase. Para convenios importa más, porque alimentan `/one` y la tarjeta de
-  cada miembro.
+Un evento aparece en la web solo si está **confirmado**, es **público** y tiene
+**link de Evently** — el ERP exige las tres cosas antes de publicar.
 
 ### 4. v2 — no empezado
 
@@ -212,6 +255,32 @@ fondo y `relative z-10` en el contenido.
 ensucia el degradado. Usar `drop-shadow`.
 
 **`public/` creada después de arrancar el server** no se sirve hasta reiniciar.
+
+**El enlace de acceso del miembro puede volver de tres formas distintas** y hay
+que atender las tres, porque el correo se abre en el dispositivo del miembro:
+`?token_hash=` (el bueno, sirve en cualquier navegador), `?code=` (PKCE, solo en
+el navegador que pidió el código) y `#access_token=` (implícito, el que usa la
+invitación del ERP porque se dispara desde el servidor). El fragmento **nunca
+llega al servidor**: por eso existe `/auth/enlace`, que lo lee desde el
+navegador, y `AuthHashCatcher` en el layout raíz, que rescata los tokens si
+aterrizan en la portada.
+
+**El QR rotativo se alinea a ventanas fijas de 5 minutos**, no al momento en que
+el miembro abre el carnet. Sin margen, un QR generado al final de una ventana
+vivía segundos y el comercio veía "QR vencido" con una membresía vigente. Por eso
+`QR_GRACE_SECONDS` acepta la ventana anterior: todo token sirve entre 5 y 10
+minutos.
+
+**`member_code` usa un alfabeto sin caracteres ambiguos** (sin 0, 1, I, L, O).
+Un código escrito a mano fuera de ese juego —como el `STR-TEST01` que estuvo
+cargado— no valida nunca, y el comercio ve "QR vencido" sin entender por qué.
+El patrón vive en `lib/codes.ts` y lo usa el validador.
+
+**`members` es solo del dueño desde la migración 003.** Cualquier página del ERP
+que la consulte con la sesión normal recibe cero filas sin error: a Juanjo le
+salía "Miembro eliminado" en las entregas de kits y la proyección de ingresos en
+0. Las páginas de kits, escaneos y finanzas usan el cliente de servicio a
+propósito, después de verificar el permiso.
 
 ---
 

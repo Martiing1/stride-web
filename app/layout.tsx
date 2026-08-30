@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Inter, Outfit } from "next/font/google";
 import "./globals.css";
+import { PwaRegister } from "@/components/PwaRegister";
+import { AuthHashCatcher } from "@/components/AuthHashCatcher";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const outfit = Outfit({ subsets: ["latin"], variable: "--font-outfit" });
@@ -40,7 +42,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es-CL" className={`${inter.variable} ${outfit.variable}`}>
-      <body className="font-body antialiased">{children}</body>
+      <body className="font-body antialiased">{children}<PwaRegister /><AuthHashCatcher /></body>
     </html>
   );
 }

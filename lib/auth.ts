@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { createClient } from "./supabase/server";
 import type { Role, TeamMember } from "./types";
 
+export const OWNER_ADMIN_EMAIL = "martin.munoz.padilla1@gmail.com";
+
 /**
  * Devuelve la persona del equipo asociada a la sesión actual, o null.
  * Una cuenta de Supabase Auth que no esté en team_members (o esté inactiva)
@@ -35,6 +37,30 @@ export async function requireTeamMember(allowedRoles?: Role[]): Promise<TeamMemb
   if (!member) redirect("/admin/login");
 
   if (allowedRoles && !allowedRoles.includes(member.role)) {
+    redirect("/admin?error=sin-permiso");
+  }
+
+  return member;
+}
+
+/** ¿La sesión actual es la del dueño? Sirve para no ofrecer lo que va a rebotar. */
+export async function isCurrentUserOwner(): Promise<boolean> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return user?.email?.trim().toLowerCase() === OWNER_ADMIN_EMAIL;
+}
+
+/** Acciones de membresía: por decisión operativa pertenecen solo a Martín. */
+export async function requireOwner(): Promise<TeamMember> {
+  const member = await requireTeamMember(["socio"]);
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (user?.email?.trim().toLowerCase() !== OWNER_ADMIN_EMAIL) {
     redirect("/admin?error=sin-permiso");
   }
 

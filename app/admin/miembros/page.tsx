@@ -1,16 +1,15 @@
 import { IdCard } from "lucide-react";
-import { requireTeamMember } from "@/lib/auth";
+import { requireOwner } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { isMembershipValid, formatDateCL } from "@/lib/membership";
 import { NewMemberForm } from "@/components/admin/NewMemberForm";
 import { MemberRow } from "@/components/admin/MemberRow";
-import { SITE } from "@/lib/site";
 import type { Member } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 export default async function MiembrosPage() {
-  await requireTeamMember(["socio", "lider_comunidad"]);
+  await requireOwner();
   const supabase = await createClient();
 
   const { data } = await supabase
@@ -39,8 +38,6 @@ export default async function MiembrosPage() {
               key={member.id}
               member={member}
               valid={isMembershipValid(member)}
-              cardUrl={`${SITE.url}/tarjeta/${member.card_token}`}
-              validateUrl={`${SITE.url}/validar/${member.member_code}`}
               validUntilLabel={formatDateCL(member.valid_until)}
             />
           ))}
@@ -50,7 +47,7 @@ export default async function MiembrosPage() {
           <IdCard className="h-10 w-10 text-white/25" />
           <p className="font-heading text-lg font-bold text-white">Todavía no hay miembros</p>
           <p className="max-w-sm text-sm text-white/50">
-            Cuando alguien pague en Skool, dalo de alta acá y le generamos su tarjeta con QR.
+            Crea la primera ficha y después envía su invitación cuando esté todo revisado.
           </p>
         </div>
       )}

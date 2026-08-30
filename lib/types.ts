@@ -117,10 +117,12 @@ export interface EventConfirmationStatus {
 
 export interface Member {
   id: string;
+  auth_user_id: string | null;
   member_code: string;
   card_token: string;
   full_name: string;
   photo_url: string | null;
+  photo_path: string | null;
   email: string | null;
   whatsapp: string | null;
   plan: string;
@@ -129,6 +131,10 @@ export interface Member {
   valid_until: string | null;
   skool_handle: string | null;
   notes: string | null;
+  invitation_status: "pendiente" | "enviada" | "activada" | "error";
+  invited_at: string | null;
+  activated_at: string | null;
+  last_login_at: string | null;
   created_at: string;
   updated_at: string;
 }

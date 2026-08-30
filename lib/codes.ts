@@ -4,6 +4,13 @@ import { randomBytes } from "node:crypto";
 // dictar por teléfono o escribir a mano sin errores.
 const READABLE = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
 
+/**
+ * Forma exacta de un member_code. Se exporta para que el validador del QR use
+ * el mismo alfabeto: un código escrito a mano fuera de este juego de caracteres
+ * no valida nunca, y el comercio ve "QR vencido" sin entender por qué.
+ */
+export const MEMBER_CODE_PATTERN = new RegExp(`^STR-[${READABLE}]{6}$`);
+
 function randomFrom(alphabet: string, length: number): string {
   const bytes = randomBytes(length);
   let out = "";

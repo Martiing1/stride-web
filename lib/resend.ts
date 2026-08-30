@@ -48,3 +48,51 @@ export async function notifyNewLead(lead: LeadNotification) {
     `,
   });
 }
+
+interface MemberAccessEmail {
+  to: string;
+  fullName: string;
+  link: string;
+  code: string | null;
+}
+
+/** ¿Hay un remitente propio configurado? Si no, el correo lo manda Supabase. */
+export function canSendOwnEmail(): boolean {
+  return Boolean(process.env.RESEND_API_KEY);
+}
+
+/**
+ * Correo de acceso al carnet, enviado por nosotros.
+ *
+ * Vale la pena no depender del correo de Supabase por dos razones: su SMTP de
+ * cortesía entrega pocos mensajes por hora, y su enlace por defecto arrastra el
+ * flujo con el que se pidió. El enlace de acá va con `token_hash`, que se puede
+ * abrir en cualquier dispositivo.
+ */
+export async function sendMemberAccessEmail({ to, fullName, link, code }: MemberAccessEmail) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) throw new Error("RESEND_API_KEY no configurada");
+
+  const resend = new Resend(apiKey);
+  const firstName = fullName.trim().split(" ")[0];
+
+  await resend.emails.send({
+    from: process.env.LEADS_NOTIFY_FROM ?? "STRIDE <hola@stridechile.cl>",
+    to: [to],
+    subject: "Tu carnet STRIDE ONE",
+    html: `
+      <div style="font-family:system-ui,-apple-system,sans-serif;max-width:520px">
+        <h2 style="color:#7C3AED;margin-bottom:4px">Hola ${firstName}</h2>
+        <p style="color:#444;line-height:1.6">Tu carnet digital STRIDE ONE está listo. Ábrelo con este botón:</p>
+        <p style="margin:28px 0">
+          <a href="${link}" style="background:#7C3AED;color:#fff;padding:14px 24px;border-radius:999px;text-decoration:none;font-weight:600">Abrir mi carnet</a>
+        </p>
+        ${code ? `<p style="color:#444;line-height:1.6">Si el botón no funciona, entra a <a href="https://stridechile.cl/miembros/ingresar">stridechile.cl/miembros/ingresar</a> y escribe este código:</p>
+        <p style="font-family:monospace;font-size:28px;letter-spacing:6px;color:#111;margin:8px 0 24px">${code}</p>` : ""}
+        <p style="font-size:13px;color:#888;line-height:1.6">
+          El enlace sirve una sola vez y vence en una hora. Guarda el carnet en la pantalla de inicio de tu teléfono para tenerlo a mano.
+        </p>
+      </div>
+    `,
+  });
+}
