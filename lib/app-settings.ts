@@ -40,6 +40,7 @@ export const MODULES: ModuleDef[] = [
   { href: "/admin/convenios", label: "Convenios", section: "Membresía", roles: ["socio", "lider_comunidad"] },
   { href: "/admin/leads", label: "Leads", section: "Membresía", roles: ["socio", "lider_comunidad"] },
   { href: "/admin/testimonios", label: "Testimonios", section: "Membresía", roles: ["socio", "lider_comunidad"] },
+  { href: "/admin/documentos", label: "Documentos", section: "Recursos" },
   { href: "/admin/kits", label: "Kits e inventario", section: "Recursos" },
   { href: "/admin/finanzas", label: "Finanzas", section: "Recursos", roles: ["socio"] },
   { href: "/admin/equipo", label: "Equipo", section: "Configuración", roles: ["socio"] },
