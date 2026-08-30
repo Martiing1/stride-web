@@ -167,6 +167,9 @@ export interface Benefit {
   active: boolean;
   sort_order: number;
   created_at: string;
+  /** Coordenadas del local (migración 006), para cruzar escaneos. */
+  lat?: number | null;
+  lng?: number | null;
 }
 
 export interface Scan {

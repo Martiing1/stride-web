@@ -18,7 +18,24 @@ const BenefitSchema = z.object({
   address: z.string().trim().max(200),
   instagram: z.string().trim().max(80),
   sort_order: z.string().max(4),
+  location: z.string().trim().max(500),
 });
+
+/**
+ * Saca coordenadas de lo que sea que pegue el usuario: un link de Google Maps
+ * (…@-36.82,-73.05,17z… o …!3d-36.82!4d-73.05…) o "lat, lng" a mano.
+ */
+function parseCoords(value: string): { lat: number; lng: number } | null {
+  const at = value.match(/@(-?\d{1,2}\.\d+),(-?\d{1,3}\.\d+)/);
+  const bang = value.match(/!3d(-?\d{1,2}\.\d+)!4d(-?\d{1,3}\.\d+)/);
+  const plain = value.match(/^\s*(-?\d{1,2}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)\s*$/);
+  const m = bang ?? at ?? plain;
+  if (!m) return null;
+  const lat = Number(m[1]);
+  const lng = Number(m[2]);
+  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
+  return { lat, lng };
+}
 
 /** Todo lo visible en /one y en el carnet sale de acá: se limpia antes de guardar. */
 function toRow(d: z.infer<typeof BenefitSchema>) {
@@ -31,6 +48,9 @@ function toRow(d: z.infer<typeof BenefitSchema>) {
     // Se guarda sin arroba: la web la agrega al mostrarlo.
     instagram: d.instagram ? d.instagram.replace(/^@/, "") : null,
     sort_order: d.sort_order ? Number(d.sort_order) : 0,
+    // Ubicación vacía = borrar coordenadas; texto sin coordenadas legibles = conservar nada.
+    lat: d.location ? parseCoords(d.location)?.lat ?? null : null,
+    lng: d.location ? parseCoords(d.location)?.lng ?? null : null,
   };
 }
 
@@ -43,6 +63,7 @@ function parse(formData: FormData) {
     address: formData.get("address") ?? "",
     instagram: formData.get("instagram") ?? "",
     sort_order: formData.get("sort_order") ?? "",
+    location: formData.get("location") ?? "",
   });
 }
 

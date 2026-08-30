@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { createRoute, updateRoute, archiveRoute, setRouteGpx } from "@/app/admin/rutas/actions";
+import { GpxPreview } from "@/components/admin/GpxPreview";
 import type { Route } from "@/lib/types";
 
 const DIFFICULTY_TONES: Record<string, string> = {
@@ -236,6 +237,8 @@ export function RoutesManager({ routes }: { routes: Route[] }) {
                 )}
 
                 {route.notes && <p className="mt-2 text-xs text-white/50">{route.notes}</p>}
+
+                {route.gpx_url && <GpxPreview url={route.gpx_url} />}
 
                 <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-white/5 pt-3">
                   {route.gpx_url ? (

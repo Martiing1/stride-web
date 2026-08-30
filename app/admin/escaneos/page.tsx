@@ -2,7 +2,7 @@ import { ScanLine, MapPin, MapPinOff } from "lucide-react";
 import { requireTeamMember } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
 import { todayInChile } from "@/lib/membership";
-import type { Scan } from "@/lib/types";
+import type { Benefit, Scan } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -19,13 +19,45 @@ export default async function EscaneosPage() {
 
   const monthStart = `${todayInChile().slice(0, 7)}-01`;
 
-  const { data } = await supabase
-    .from("scans")
-    .select("*, members(full_name)")
-    .order("scanned_at", { ascending: false })
-    .limit(200);
+  const [{ data }, { data: benefitsData }] = await Promise.all([
+    supabase
+      .from("scans")
+      .select("*, members(full_name)")
+      .order("scanned_at", { ascending: false })
+      .limit(200),
+    supabase.from("benefits").select("id, business_name, lat, lng"),
+  ]);
 
   const scans = (data ?? []) as ScanWithMember[];
+  const located = ((benefitsData ?? []) as Benefit[]).filter((b) => b.lat != null && b.lng != null);
+
+  // Local más cercano al escaneo, hasta 500 m: con eso se sabe dónde se cobra
+  // cada beneficio, que es el dato para renegociar convenios.
+  function nearestBenefit(lat: number, lng: number): Benefit | null {
+    let best: Benefit | null = null;
+    let bestKm = 0.5;
+    for (const benefit of located) {
+      const dLat = ((benefit.lat! - lat) * Math.PI) / 180;
+      const dLng = ((benefit.lng! - lng) * Math.PI) / 180;
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat * Math.PI) / 180) * Math.cos((benefit.lat! * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+      const km = 2 * 6371 * Math.asin(Math.sqrt(a));
+      if (km < bestKm) { bestKm = km; best = benefit; }
+    }
+    return best;
+  }
+
+  const scanBenefit = new Map<string, string>();
+  const perLocal = new Map<string, number>();
+  for (const scan of scans) {
+    if (scan.geo_source === "gps" && scan.lat != null && scan.lng != null) {
+      const benefit = nearestBenefit(scan.lat, scan.lng);
+      if (benefit) {
+        scanBenefit.set(scan.id, benefit.business_name);
+        perLocal.set(benefit.business_name, (perLocal.get(benefit.business_name) ?? 0) + 1);
+      }
+    }
+  }
+  const localesRanked = Array.from(perLocal.entries()).sort((a, b) => b[1] - a[1]);
 
   const thisMonth = scans.filter((s) => s.scanned_at >= monthStart);
   const withGeo = scans.filter((s) => s.geo_source === "gps").length;
@@ -54,6 +86,23 @@ export default async function EscaneosPage() {
         ))}
       </section>
 
+      {localesRanked.length > 0 && (
+        <section className="card">
+          <h2 className="mb-3 font-heading text-lg font-bold text-white">Dónde se cobra</h2>
+          <ul className="space-y-1.5">
+            {localesRanked.map(([name, count]) => (
+              <li key={name} className="flex items-center justify-between text-sm">
+                <span className="text-white/70">{name}</span>
+                <span className="font-semibold text-white">{count} escaneo{count === 1 ? "" : "s"}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-3 text-xs text-white/35">
+            Se cruza la ubicación del escaneo con las coordenadas cargadas en Convenios (radio 500 m).
+          </p>
+        </section>
+      )}
+
       {scans.length > 0 ? (
         <section className="space-y-2">
           {scans.map((scan) => (
@@ -75,6 +124,11 @@ export default async function EscaneosPage() {
                 })}
               </div>
 
+              {scanBenefit.get(scan.id) && (
+                <span className="shrink-0 rounded-full bg-stride-cyan/10 px-2.5 py-1 text-xs font-semibold text-stride-cyan">
+                  {scanBenefit.get(scan.id)}
+                </span>
+              )}
               {scan.geo_source === "gps" && scan.lat && scan.lng ? (
                 <a
                   href={`https://www.google.com/maps?q=${scan.lat},${scan.lng}`}

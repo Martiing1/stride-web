@@ -34,6 +34,7 @@ export const MODULES: ModuleDef[] = [
   { href: "/admin/planificaciones", label: "Planificaciones", section: "Social Run" },
   { href: "/admin/rutas", label: "Rutas", section: "Social Run" },
   { href: "/admin/evaluaciones", label: "Evaluaciones", section: "Social Run", fixed: true },
+  { href: "/admin/metricas", label: "Métricas", section: "Social Run", roles: ["socio", "lider_comunidad"] },
   { href: "/admin/membresia", label: "Plan del mes", section: "Membresía", roles: ["socio", "lider_comunidad"] },
   { href: "/admin/miembros", label: "Miembros", section: "Membresía", roles: ["socio", "lider_comunidad"], ownerOnly: true },
   { href: "/admin/escaneos", label: "Escaneos", section: "Membresía", roles: ["socio", "lider_comunidad"] },

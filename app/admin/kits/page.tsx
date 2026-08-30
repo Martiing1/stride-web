@@ -4,6 +4,7 @@ import { requireTeamMember } from "@/lib/auth";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { formatCLP } from "@/lib/site";
 import { KitsManager, type DeliveryRow, type MemberOption } from "@/components/admin/KitsManager";
+import { KitBundles, type BundleView } from "@/components/admin/KitBundles";
 import type { InventoryItem } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +19,7 @@ export default async function KitsPage() {
   // pertenecer al equipo, y de acá solo salen id y nombre.
   const service = createServiceClient();
 
-  const [{ data: itemsData }, { data: deliveriesData }, { data: membersData }] = await Promise.all([
+  const [{ data: itemsData }, { data: deliveriesData }, { data: membersData }, { data: bundlesData }, { data: bundleItemsData }] = await Promise.all([
     supabase.from("inventory_items").select("*").order("name").order("size"),
     service
       .from("kit_deliveries")
@@ -26,11 +27,26 @@ export default async function KitsPage() {
       .order("created_at", { ascending: false })
       .limit(50),
     service.from("members").select("id, full_name").eq("status", "activa").order("full_name"),
+    supabase.from("kit_bundles").select("*").eq("active", true).order("name"),
+    supabase.from("kit_bundle_items").select("bundle_id, item_id, quantity"),
   ]);
 
   const items = (itemsData ?? []) as InventoryItem[];
   const deliveries = (deliveriesData ?? []) as unknown as DeliveryRow[];
   const members = (membersData ?? []) as MemberOption[];
+
+  const itemById = new Map(items.map((i) => [i.id, i]));
+  const bundles: BundleView[] = ((bundlesData ?? []) as Array<{ id: string; name: string; notes: string | null }>).map((b) => ({
+    ...b,
+    items: ((bundleItemsData ?? []) as Array<{ bundle_id: string; item_id: string; quantity: number }>)
+      .filter((bi) => bi.bundle_id === b.id)
+      .map((bi) => ({
+        item_id: bi.item_id,
+        quantity: bi.quantity,
+        name: itemById.get(bi.item_id)?.name ?? "Artículo eliminado",
+        size: itemById.get(bi.item_id)?.size ?? null,
+      })),
+  }));
 
   const pendientes = deliveries.filter((d) => d.status === "pendiente");
   const valorStock = items.reduce((sum, i) => sum + i.stock * (i.unit_cost_clp ?? 0), 0);
@@ -56,6 +72,8 @@ export default async function KitsPage() {
           Hay {pendientes.length} kits sin entregar. Coordina el retiro en el próximo Social Run.
         </p>
       )}
+
+      <KitBundles bundles={bundles} items={items} members={members} />
 
       <KitsManager
         items={items}

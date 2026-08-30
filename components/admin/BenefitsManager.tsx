@@ -174,9 +174,22 @@ function BenefitForm({
         </div>
       </div>
 
-      <div>
-        <label htmlFor="address" className="label">Dirección</label>
-        <input id="address" name="address" defaultValue={benefit?.address ?? ""} className="input" placeholder="Av. Siempre Viva 123, Concepción" />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label htmlFor="address" className="label">Dirección</label>
+          <input id="address" name="address" defaultValue={benefit?.address ?? ""} className="input" placeholder="Av. Siempre Viva 123, Concepción" />
+        </div>
+        <div>
+          <label htmlFor="location" className="label">Ubicación (link de Maps o lat, lng)</label>
+          <input
+            id="location"
+            name="location"
+            defaultValue={benefit?.lat != null && benefit?.lng != null ? `${benefit.lat}, ${benefit.lng}` : ""}
+            className="input"
+            placeholder="https://maps.google.com/…  o  -36.82, -73.05"
+          />
+          <p className="mt-1 text-xs text-white/35">Con esto los escaneos se cruzan con el local.</p>
+        </div>
       </div>
 
       {error && <p className="rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-200">{error}</p>}

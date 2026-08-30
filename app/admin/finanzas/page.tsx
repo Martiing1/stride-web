@@ -1,4 +1,6 @@
 import { TrendingUp, TrendingDown, Wallet, LineChart } from "lucide-react";
+import Link from "next/link";
+import { BookOpen, Target, UserMinus } from "lucide-react";
 import { requireTeamMember } from "@/lib/auth";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { formatCLP, SITE } from "@/lib/site";
@@ -38,6 +40,16 @@ export default async function FinanzasPage() {
   const transactions = (txData ?? []) as Transaction[];
   const summary = (summaryData ?? []) as MonthlyFinanceSummary[];
 
+  // Churn del mes: pausas registradas en la bitácora de membresías contra la
+  // base activa. Con pocos miembros va a ser 0% o brutal; es la señal igual.
+  const { data: monthAudit } = await createServiceClient()
+    .from("membership_audit_log")
+    .select("action")
+    .gte("created_at", `${monthStart}T00:00:00Z`);
+  const bajas = (monthAudit ?? []).filter((a) => a.action === "paused").length;
+  const renovaciones = (monthAudit ?? []).filter((a) => a.action === "renewed").length;
+  const churn = (activeMembers ?? 0) + bajas > 0 ? Math.round((bajas / ((activeMembers ?? 0) + bajas)) * 100) : null;
+
   const thisMonth = transactions.filter((t) => t.occurred_on >= monthStart);
   const ingresos = thisMonth.filter((t) => t.kind === "ingreso").reduce((s, t) => s + t.amount_clp, 0);
   const gastos = thisMonth.filter((t) => t.kind === "gasto").reduce((s, t) => s + t.amount_clp, 0);
@@ -58,7 +70,16 @@ export default async function FinanzasPage() {
         <p className="mt-1 text-white/50">Movimientos, balance mensual y proyección.</p>
       </header>
 
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <nav className="flex flex-wrap gap-3">
+        <Link href="/admin/finanzas/libro" className="inline-flex items-center gap-2 rounded-full border border-white/15 px-5 py-2.5 text-sm font-semibold text-white/80 transition hover:border-white/30 hover:text-white">
+          <BookOpen className="h-4 w-4" /> Libro diario
+        </Link>
+        <Link href="/admin/finanzas/presupuestos" className="inline-flex items-center gap-2 rounded-full border border-white/15 px-5 py-2.5 text-sm font-semibold text-white/80 transition hover:border-white/30 hover:text-white">
+          <Target className="h-4 w-4" /> Presupuestos
+        </Link>
+      </nav>
+
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {[
           { label: "Ingresos del mes", value: formatCLP(ingresos), icon: TrendingUp, tone: "text-emerald-400" },
           { label: "Gastos del mes", value: formatCLP(gastos), icon: TrendingDown, tone: "text-red-400" },
@@ -69,6 +90,12 @@ export default async function FinanzasPage() {
             tone: resultado >= 0 ? "text-emerald-400" : "text-red-400",
           },
           { label: "Proyección membresía", value: formatCLP(mrr), icon: LineChart, tone: "text-stride-cyan" },
+          {
+            label: `Churn del mes (${bajas} baja${bajas === 1 ? "" : "s"} · ${renovaciones} renov.)`,
+            value: churn != null ? `${churn}%` : "—",
+            icon: UserMinus,
+            tone: churn && churn > 10 ? "text-red-400" : "text-white",
+          },
         ].map(({ label, value, icon: Icon, tone }) => (
           <div key={label} className="card">
             <div className="flex items-start justify-between">
