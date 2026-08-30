@@ -5,20 +5,38 @@ import { useRouter } from "next/navigation";
 import {
   Plus, X, Loader2, MessageCircle, Mail, Trash2, StickyNote, GripVertical,
 } from "lucide-react";
-import { createLead, moveLead, updateLeadNotes, deleteLead } from "@/app/admin/leads/actions";
+import { createLead, moveLead, updateLeadNotes, deleteLead, setLeadTemperature } from "@/app/admin/leads/actions";
 import { MOTIVATION_OPTIONS, MOTIVATION_LABELS } from "@/lib/lead-options";
 import type { Lead } from "@/lib/types";
 
 type Status = Lead["status"];
 
-const COLUMNS: { value: Status; label: string; tone: string }[] = [
-  { value: "nuevo", label: "Nuevo", tone: "border-stride-cyan/40" },
-  { value: "contactado", label: "Contactado", tone: "border-stride-indigo/40" },
-  { value: "convertido", label: "Convertido", tone: "border-emerald-500/40" },
-  { value: "descartado", label: "Descartado", tone: "border-white/10" },
+// El nombre de cada columna se configura en /admin/configuracion.
+const COLUMN_DEFS: { value: Status; tone: string }[] = [
+  { value: "nuevo", tone: "border-stride-cyan/40" },
+  { value: "contactado", tone: "border-stride-indigo/40" },
+  // Agendado = invitado a la reunión de fin de mes.
+  { value: "agendado", tone: "border-amber-400/40" },
+  { value: "convertido", tone: "border-emerald-500/40" },
+  { value: "descartado", tone: "border-white/10" },
 ];
 
-export function LeadsKanban({ leads, canDelete }: { leads: Lead[]; canDelete: boolean }) {
+const TEMPERATURES: Array<{ value: NonNullable<Lead["temperature"]>; label: string; active: string }> = [
+  { value: "frio", label: "Frío", active: "bg-sky-500/20 text-sky-300 border-sky-400/40" },
+  { value: "tibio", label: "Tibio", active: "bg-amber-500/20 text-amber-300 border-amber-400/40" },
+  { value: "caliente", label: "Caliente", active: "bg-red-500/20 text-red-300 border-red-400/40" },
+];
+
+export function LeadsKanban({
+  leads,
+  canDelete,
+  labels,
+}: {
+  leads: Lead[];
+  canDelete: boolean;
+  labels: Record<string, string>;
+}) {
+  const COLUMNS = COLUMN_DEFS.map((c) => ({ ...c, label: labels[c.value] ?? c.value }));
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [showForm, setShowForm] = useState(false);
@@ -63,6 +81,18 @@ export function LeadsKanban({ leads, canDelete }: { leads: Lead[]; canDelete: bo
     form.reset();
     setShowForm(false);
     router.refresh();
+  }
+
+  function setTemperature(id: string, current: Lead["temperature"], value: NonNullable<Lead["temperature"]>) {
+    const form = new FormData();
+    form.set("id", id);
+    // Tocar la etiqueta activa la apaga.
+    form.set("temperature", current === value ? "" : value);
+    startTransition(async () => {
+      const res = await setLeadTemperature(form);
+      if (!res.ok) setError(res.error ?? "No se pudo etiquetar.");
+      router.refresh();
+    });
   }
 
   async function saveNotes(id: string, notes: string) {
@@ -165,7 +195,7 @@ export function LeadsKanban({ leads, canDelete }: { leads: Lead[]; canDelete: bo
       )}
 
       {/* Tablero */}
-      <div className="grid gap-4 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         {COLUMNS.map((col) => {
           const items = leads.filter((l) => l.status === col.value);
           return (
@@ -236,7 +266,24 @@ export function LeadsKanban({ leads, canDelete }: { leads: Lead[]; canDelete: bo
                         )
                       )}
 
-                      <div className="mt-2.5 flex items-center gap-1.5 border-t border-white/5 pt-2.5">
+                      <div className="mt-2.5 flex items-center gap-1 border-t border-white/5 pt-2.5">
+                        {TEMPERATURES.map((t) => (
+                          <button
+                            key={t.value}
+                            type="button"
+                            disabled={pending}
+                            onClick={() => setTemperature(lead.id, lead.temperature ?? null, t.value)}
+                            title={`Marcar ${t.label.toLowerCase()}`}
+                            className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold transition ${
+                              lead.temperature === t.value ? t.active : "border-white/10 text-white/30 hover:text-white/60"
+                            }`}
+                          >
+                            {t.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="mt-2 flex items-center gap-1.5">
                         {wa && (
                           <a href={`https://wa.me/${wa}`} target="_blank" rel="noopener noreferrer"
                             aria-label={`WhatsApp de ${lead.full_name}`}

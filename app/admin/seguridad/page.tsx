@@ -1,6 +1,8 @@
 import { ShieldCheck } from "lucide-react";
 import { requireTeamMember } from "@/lib/auth";
 import { TotpManager } from "@/components/admin/TotpManager";
+import { MyPhotoUploader } from "@/components/admin/MyPhotoUploader";
+import { createServiceClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -8,6 +10,14 @@ export const metadata = { title: "Seguridad" };
 
 export default async function SecurityPage() {
   const member = await requireTeamMember();
+
+  let photoUrl: string | null = null;
+  if (member.photo_path) {
+    const { data: signed } = await createServiceClient()
+      .storage.from("team-photos")
+      .createSignedUrl(member.photo_path, 600);
+    photoUrl = signed?.signedUrl ?? null;
+  }
 
   return (
     <div className="space-y-6">
@@ -22,6 +32,8 @@ export default async function SecurityPage() {
           pide un código que solo existe en tu teléfono.
         </p>
       </header>
+
+      <MyPhotoUploader photoUrl={photoUrl} name={member.nickname ?? member.full_name} />
 
       <TotpManager accountEmail={member.email} />
     </div>

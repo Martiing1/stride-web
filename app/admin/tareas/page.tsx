@@ -2,6 +2,7 @@ import { requireTeamMember, isStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { todayInChile } from "@/lib/membership";
 import { TaskBoard } from "@/components/admin/TaskBoard";
+import { getAppConfig } from "@/lib/app-settings-server";
 import type { Task, TeamMember } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -30,9 +31,10 @@ export default async function TareasPage({
     query = query.in("status", ["pendiente", "en_progreso", "bloqueada", "recurrente"]);
   }
 
-  const [{ data: tasksData }, { data: teamData }] = await Promise.all([
+  const [{ data: tasksData }, { data: teamData }, config] = await Promise.all([
     query,
     supabase.from("team_members").select("*").eq("status", "activo").order("full_name"),
+    getAppConfig(),
   ]);
 
   return (
@@ -52,6 +54,7 @@ export default async function TareasPage({
         today={todayInChile()}
         activeAssignee={assigneeFilter ?? "todos"}
         activeStatus={estado ?? "abiertas"}
+        statusLabels={config.taskLabels}
       />
     </div>
   );

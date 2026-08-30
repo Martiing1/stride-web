@@ -1,6 +1,7 @@
 import { requireTeamMember } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { LeadsKanban } from "@/components/admin/LeadsKanban";
+import { getAppConfig } from "@/lib/app-settings-server";
 import type { Lead } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +29,7 @@ export default async function LeadsPage() {
         </p>
       </header>
 
-      <LeadsKanban leads={leads} canDelete={member.role === "socio"} />
+      <LeadsKanban labels={(await getAppConfig()).leadLabels} leads={leads} canDelete={member.role === "socio"} />
     </div>
   );
 }

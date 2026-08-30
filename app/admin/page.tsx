@@ -1,6 +1,9 @@
 import Link from "next/link";
-import { ListTodo, IdCard, ScanLine, UserPlus, AlertTriangle, ArrowRight, ShieldAlert, Lock } from "lucide-react";
+import { ListTodo, IdCard, ScanLine, UserPlus, AlertTriangle, ArrowRight, ShieldAlert, Lock, Footprints } from "lucide-react";
 import { requireTeamMember, isStaff, isCurrentUserOwner } from "@/lib/auth";
+import { type WidgetId } from "@/lib/app-settings";
+import { getAppConfig } from "@/lib/app-settings-server";
+import { createServiceClient } from "@/lib/supabase/server";
 import { createClient } from "@/lib/supabase/server";
 import { todayInChile } from "@/lib/membership";
 
@@ -34,19 +37,44 @@ export default async function AdminDashboard({
   const { data: { user: authUser } } = await supabase.auth.getUser();
   const hasSecondFactor = (authUser?.factors ?? []).some((f) => f.status === "verified");
 
-  const [myOpenTasks, overdueTasks, activeMembers, newLeads, scansThisMonth] = await Promise.all([
-    count(supabase, "tasks", (q) =>
-      q.eq("assignee_id", member.id).in("status", ["pendiente", "en_progreso"])
-    ),
-    count(supabase, "tasks", (q) =>
-      q.in("status", ["pendiente", "en_progreso"]).lt("due_date", today)
-    ),
-    staff ? count(supabase, "members", (q) => q.eq("status", "activa")) : Promise.resolve(0),
-    staff ? count(supabase, "leads", (q) => q.eq("status", "nuevo")) : Promise.resolve(0),
-    staff
-      ? count(supabase, "scans", (q) => q.gte("scanned_at", `${today.slice(0, 7)}-01`))
-      : Promise.resolve(0),
-  ]);
+  const config = await getAppConfig();
+  const monthStart = `${today.slice(0, 7)}-01`;
+
+  // Asistencia del mes: inscritos validados en puerta (import de Evently) de
+  // los eventos con fecha en el mes en curso.
+  async function attendanceThisMonth(): Promise<number> {
+    const { data: monthEvents, error } = await supabase
+      .from("events")
+      .select("id")
+      .gte("event_date", monthStart)
+      .lte("event_date", today);
+    if (error || !monthEvents?.length) return 0;
+    const { count: n, error: countError } = await supabase
+      .from("event_registrations")
+      .select("*", { count: "exact", head: true })
+      .in("event_id", monthEvents.map((e) => e.id))
+      .not("validated_at", "is", null);
+    return countError ? 0 : n ?? 0;
+  }
+
+  const [myOpenTasks, overdueTasks, activeMembers, newLeads, scansThisMonth, attendance] =
+    await Promise.all([
+      count(supabase, "tasks", (q) =>
+        q.eq("assignee_id", member.id).in("status", ["pendiente", "en_progreso"])
+      ),
+      count(supabase, "tasks", (q) =>
+        q.in("status", ["pendiente", "en_progreso"]).lt("due_date", today)
+      ),
+      // El conteo va por servicio: members es del dueño desde la migración 003.
+      staff
+        ? createServiceClient().from("members").select("*", { count: "exact", head: true }).eq("status", "activa").then(({ count: n }) => n ?? 0)
+        : Promise.resolve(0),
+      staff ? count(supabase, "leads", (q) => q.eq("status", "nuevo")) : Promise.resolve(0),
+      staff && config.widgets.includes("escaneos_mes")
+        ? count(supabase, "scans", (q) => q.gte("scanned_at", `${monthStart}`))
+        : Promise.resolve(0),
+      config.widgets.includes("asistencia_mes") ? attendanceThisMonth() : Promise.resolve(0),
+    ]);
 
   const { data: upcoming } = await supabase
     .from("events")
@@ -63,20 +91,18 @@ export default async function AdminDashboard({
     .order("due_date", { nullsFirst: false })
     .limit(5);
 
-  const stats = [
-    { label: "Mis tareas abiertas", value: myOpenTasks, icon: ListTodo, href: "/admin/tareas" },
-    { label: "Tareas vencidas", value: overdueTasks, icon: AlertTriangle, href: "/admin/tareas", alert: overdueTasks > 0 },
-    ...(staff
-      ? [
-          // La ficha de miembros es solo del dueño: al resto no se le ofrece un link que rebota.
-          ...(isOwner
-            ? [{ label: "Miembros activos", value: activeMembers, icon: IdCard, href: "/admin/miembros" }]
-            : []),
-          { label: "Leads sin contactar", value: newLeads, icon: UserPlus, href: "/admin/leads" },
-          { label: "Escaneos este mes", value: scansThisMonth, icon: ScanLine, href: "/admin/escaneos" },
-        ]
-      : []),
-  ];
+  // Widgets configurables desde /admin/configuracion, en el orden elegido.
+  const catalogue: Record<WidgetId, { label: string; value: number; icon: typeof ListTodo; href: string; alert?: boolean; staffOnly?: boolean; ownerOnly?: boolean }> = {
+    tareas_abiertas: { label: "Mis tareas abiertas", value: myOpenTasks, icon: ListTodo, href: "/admin/tareas" },
+    tareas_vencidas: { label: "Tareas vencidas", value: overdueTasks, icon: AlertTriangle, href: "/admin/tareas", alert: overdueTasks > 0 },
+    asistencia_mes: { label: "Asistentes a social runs este mes", value: attendance, icon: Footprints, href: "/admin/eventos" },
+    miembros_activos: { label: "Miembros activos", value: activeMembers, icon: IdCard, href: "/admin/miembros", staffOnly: true, ownerOnly: true },
+    leads_nuevos: { label: "Leads sin contactar", value: newLeads, icon: UserPlus, href: "/admin/leads", staffOnly: true },
+    escaneos_mes: { label: "Escaneos este mes", value: scansThisMonth, icon: ScanLine, href: "/admin/escaneos", staffOnly: true },
+  };
+  const stats = config.widgets
+    .map((id) => catalogue[id])
+    .filter((w) => w && (!w.staffOnly || staff) && (!w.ownerOnly || isOwner));
 
   return (
     <div className="space-y-10">

@@ -5,7 +5,7 @@ import { z } from "zod";
 import { requireTeamMember } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
-const LEAD_STATUSES = ["nuevo", "contactado", "convertido", "descartado"] as const;
+const LEAD_STATUSES = ["nuevo", "contactado", "agendado", "convertido", "descartado"] as const;
 
 const NewLeadSchema = z.object({
   full_name: z.string().trim().min(2, "Falta el nombre").max(120),
@@ -132,6 +132,32 @@ export async function deleteLead(formData: FormData): Promise<LeadActionResult> 
   const { error } = await supabase.from("leads").delete().eq("id", id.data);
 
   if (error) return { ok: false, error: "No se pudo eliminar." };
+
+  revalidatePath("/admin/leads");
+  return { ok: true };
+}
+
+const TemperatureSchema = z.object({
+  id: z.string().uuid(),
+  temperature: z.enum(["frio", "tibio", "caliente"]).or(z.literal("")),
+});
+
+/** Etiqueta de temperatura: qué tan caliente está el lead. Vacío = sin etiqueta. */
+export async function setLeadTemperature(formData: FormData): Promise<LeadActionResult> {
+  await requireTeamMember(["socio", "lider_comunidad"]);
+
+  const parsed = TemperatureSchema.safeParse({
+    id: formData.get("id"),
+    temperature: formData.get("temperature") ?? "",
+  });
+  if (!parsed.success) return { ok: false, error: "Datos inválidos" };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("leads")
+    .update({ temperature: parsed.data.temperature || null })
+    .eq("id", parsed.data.id);
+  if (error) return { ok: false, error: "No se pudo etiquetar. ¿Corriste la migración 005?" };
 
   revalidatePath("/admin/leads");
   return { ok: true };

@@ -18,6 +18,8 @@ export interface TeamMember {
   area: string | null;
   status: "activo" | "inactivo";
   created_at: string;
+  /** Foto de perfil en el bucket team-photos (migración 005). */
+  photo_path?: string | null;
 }
 
 export interface Meeting {
@@ -193,7 +195,9 @@ export interface Lead {
   marketing_consent: boolean;
   consent_version: string | null;
   consented_at: string | null;
-  status: "nuevo" | "contactado" | "convertido" | "descartado";
+  status: "nuevo" | "contactado" | "agendado" | "convertido" | "descartado";
+  /** Qué tan caliente está el lead (migración 005). */
+  temperature?: "frio" | "tibio" | "caliente" | null;
   notes: string | null;
   created_at: string;
 }
