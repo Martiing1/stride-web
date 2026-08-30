@@ -20,6 +20,7 @@ import {
   CalendarCheck,
   ShieldCheck,
   MessageSquareQuote,
+  ClipboardCheck,
   Menu,
   X,
 } from "lucide-react";
@@ -52,6 +53,7 @@ const NAV: { section: string; items: NavItem[] }[] = [
       { href: "/admin/eventos", label: "Eventos", icon: CalendarDays },
       { href: "/admin/planificaciones", label: "Planificaciones", icon: ClipboardList },
       { href: "/admin/rutas", label: "Rutas", icon: Map },
+      { href: "/admin/evaluaciones", label: "Evaluaciones", icon: ClipboardCheck },
     ],
   },
   {

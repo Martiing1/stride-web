@@ -20,6 +20,8 @@ const PlanSchema = z.object({
   icebreaker: z.string().trim().max(1000),
   groups_notes: z.string().trim().max(1000),
   post_run_notes: z.string().trim().max(1000),
+  planner_id: uuidOrEmpty,
+  route_owner_id: uuidOrEmpty,
   lead_id: uuidOrEmpty,
   sweeper_id: uuidOrEmpty,
   photographer_id: uuidOrEmpty,
@@ -46,6 +48,8 @@ export async function savePlan(formData: FormData): Promise<PlanResult> {
     icebreaker: formData.get("icebreaker") ?? "",
     groups_notes: formData.get("groups_notes") ?? "",
     post_run_notes: formData.get("post_run_notes") ?? "",
+    planner_id: formData.get("planner_id") ?? "",
+    route_owner_id: formData.get("route_owner_id") ?? "",
     lead_id: formData.get("lead_id") ?? "",
     sweeper_id: formData.get("sweeper_id") ?? "",
     photographer_id: formData.get("photographer_id") ?? "",
@@ -72,6 +76,8 @@ export async function savePlan(formData: FormData): Promise<PlanResult> {
       icebreaker: nullIfEmpty(d.icebreaker),
       groups_notes: nullIfEmpty(d.groups_notes),
       post_run_notes: nullIfEmpty(d.post_run_notes),
+      planner_id: nullIfEmpty(d.planner_id),
+      route_owner_id: nullIfEmpty(d.route_owner_id),
       lead_id: nullIfEmpty(d.lead_id),
       sweeper_id: nullIfEmpty(d.sweeper_id),
       photographer_id: nullIfEmpty(d.photographer_id),
@@ -95,5 +101,114 @@ export async function savePlan(formData: FormData): Promise<PlanResult> {
   revalidatePath("/admin/planificaciones");
   revalidatePath(`/admin/planificaciones/${d.event_id}`);
   revalidatePath("/admin/eventos");
+  return { ok: true };
+}
+
+// ─── Estructura de la planificación (plantilla real) ─────────────────────────
+
+const BlockSchema = z.object({
+  section: z.enum(["inicio", "final", "social"]),
+  block_time: z.string().regex(/^\d{2}:\d{2}$/).or(z.literal("")),
+  leader_label: z.string().trim().max(120),
+  activity: z.string().trim().min(1).max(300),
+  notes: z.string().trim().max(500),
+});
+
+const PaceGroupSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  distance_km: z.coerce.number().positive().max(99),
+  pace_sec_per_km: z.coerce.number().int().min(120).max(1200),
+  break_min: z.coerce.number().int().min(0).max(60),
+  leaders: z.string().trim().max(200),
+  start_offset_min: z.coerce.number().int().min(0).max(180),
+});
+
+const ChecklistSchema = z.object({
+  label: z.string().trim().min(1).max(200),
+  done: z.boolean(),
+});
+
+const StructureSchema = z.object({
+  event_id: z.string().uuid(),
+  blocks: z.array(BlockSchema).max(60),
+  groups: z.array(PaceGroupSchema).max(12),
+  checklist: z.array(ChecklistSchema).max(40),
+});
+
+/**
+ * Guarda el itinerario, los grupos de ritmo y el checklist de una planificación.
+ *
+ * Reemplazo completo en vez de ediciones fila a fila: el editor trabaja con la
+ * lista entera en memoria y aquí se persiste tal cual quedó. Con este volumen
+ * (decenas de filas) es lo más simple que no puede quedar a medias.
+ */
+export async function savePlanStructure(formData: FormData): Promise<PlanResult> {
+  const member = await requireTeamMember(["socio", "lider_comunidad"]);
+
+  let payload: unknown;
+  try {
+    payload = JSON.parse(String(formData.get("payload") ?? ""));
+  } catch {
+    return { ok: false, error: "Datos inválidos" };
+  }
+  const parsed = StructureSchema.safeParse(payload);
+  if (!parsed.success) return { ok: false, error: "Revisa los campos: hay filas incompletas." };
+
+  const d = parsed.data;
+  const supabase = await createClient();
+
+  // La planificación puede no existir todavía: se crea como borrador.
+  const { data: plan, error: planError } = await supabase
+    .from("event_plans")
+    .upsert({ event_id: d.event_id, created_by: member.id }, { onConflict: "event_id", ignoreDuplicates: false })
+    .select("id")
+    .single();
+  if (planError || !plan) return { ok: false, error: "No se pudo preparar la planificación. ¿Corriste la migración 004?" };
+
+  const wipe = await Promise.all([
+    supabase.from("plan_blocks").delete().eq("plan_id", plan.id),
+    supabase.from("plan_pace_groups").delete().eq("plan_id", plan.id),
+    supabase.from("plan_checklist_items").delete().eq("plan_id", plan.id),
+  ]);
+  if (wipe.some((r) => r.error)) return { ok: false, error: "No se pudo actualizar la estructura." };
+
+  const inserts = await Promise.all([
+    d.blocks.length
+      ? supabase.from("plan_blocks").insert(
+          d.blocks.map((b, i) => ({
+            plan_id: plan.id,
+            section: b.section,
+            block_time: b.block_time || null,
+            leader_label: b.leader_label || null,
+            activity: b.activity,
+            notes: b.notes || null,
+            sort_order: i,
+          }))
+        )
+      : Promise.resolve({ error: null }),
+    d.groups.length
+      ? supabase.from("plan_pace_groups").insert(
+          d.groups.map((g, i) => ({
+            plan_id: plan.id,
+            name: g.name,
+            distance_km: g.distance_km,
+            pace_sec_per_km: g.pace_sec_per_km,
+            break_min: g.break_min,
+            leaders: g.leaders || null,
+            start_offset_min: g.start_offset_min,
+            sort_order: i,
+          }))
+        )
+      : Promise.resolve({ error: null }),
+    d.checklist.length
+      ? supabase.from("plan_checklist_items").insert(
+          d.checklist.map((c, i) => ({ plan_id: plan.id, label: c.label, done: c.done, sort_order: i }))
+        )
+      : Promise.resolve({ error: null }),
+  ]);
+  if (inserts.some((r) => r.error)) return { ok: false, error: "Se guardó a medias; vuelve a intentar." };
+
+  revalidatePath(`/admin/planificaciones/${d.event_id}`);
+  revalidatePath("/admin/planificaciones");
   return { ok: true };
 }

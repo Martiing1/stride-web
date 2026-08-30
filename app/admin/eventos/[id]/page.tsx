@@ -5,6 +5,7 @@ import { requireTeamMember, isStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { AvailabilityPanel } from "@/components/admin/AvailabilityPanel";
 import { EventStatusControls } from "@/components/admin/EventStatusControls";
+import { EventRegistrationsPanel } from "@/components/admin/EventRegistrationsPanel";
 import type { StrideEvent, EventConfirmationStatus, TeamMember } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -28,10 +29,18 @@ export default async function EventoDetailPage({
 
   const event = eventData as StrideEvent;
 
-  const [{ data: confData }, { data: teamData }, { data: availData }] = await Promise.all([
+  const [{ data: confData }, { data: teamData }, { data: availData }, registrations] = await Promise.all([
     supabase.from("event_confirmation_status").select("*").eq("event_id", id).maybeSingle(),
     supabase.from("team_members").select("*").eq("status", "activo").order("full_name"),
     supabase.from("event_availability").select("team_member_id, response").eq("event_id", id),
+    supabase
+      .from("event_registrations")
+      .select("validated_at")
+      .eq("event_id", id)
+      .then(({ data, error }) =>
+        // Antes de la migración 004 la tabla no existe: el panel parte vacío.
+        error || !data ? null : { registered: data.length, validated: data.filter((r) => r.validated_at).length }
+      ),
   ]);
 
   const confirmation = confData as EventConfirmationStatus | null;
@@ -108,6 +117,14 @@ export default async function EventoDetailPage({
         responses={Object.fromEntries(responses)}
         currentMemberId={member.id}
       />
+
+      {isStaff(member.role) && (
+        <EventRegistrationsPanel
+          eventId={event.id}
+          stats={registrations}
+          internalNotes={event.internal_notes ?? null}
+        />
+      )}
 
       {isStaff(member.role) && (
         <EventStatusControls

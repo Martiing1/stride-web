@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, type FormEvent } from "react";
+import { useEffect, useState, useMemo, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, CheckCircle2, AlertTriangle, ListTodo, Gavel, Eye } from "lucide-react";
 import { parseActa } from "@/lib/acta-parser";
@@ -16,10 +16,23 @@ import { saveActa, type SaveActaResult } from "@/app/admin/actas/actions";
 export function ActaUploader() {
   const router = useRouter();
   const [content, setContent] = useState("");
+  const [title, setTitle] = useState("");
+  const [meetingDate, setMeetingDate] = useState("");
+  const [attendees, setAttendees] = useState("");
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<SaveActaResult | null>(null);
 
   const preview = useMemo(() => (content.trim() ? parseActa(content) : null), [content]);
+
+  // El acta trae su propio encabezado: al pegarla, los campos vacíos se
+  // completan solos y cualquier corrección manual del usuario se respeta.
+  useEffect(() => {
+    const header = preview?.header;
+    if (!header) return;
+    if (header.titleSuggestion) setTitle((v) => v || header.titleSuggestion!);
+    if (header.meetingDate) setMeetingDate((v) => v || header.meetingDate!);
+    if (header.attendees.length) setAttendees((v) => v || header.attendees.join(", "));
+  }, [preview]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -91,6 +104,8 @@ export function ActaUploader() {
               id="title"
               name="title"
               required
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
               className="input"
               placeholder="Reunión operativa"
             />
@@ -99,7 +114,7 @@ export function ActaUploader() {
             <label className="label" htmlFor="meeting_date">
               Fecha
             </label>
-            <input id="meeting_date" name="meeting_date" type="date" required className="input" />
+            <input id="meeting_date" name="meeting_date" type="date" required value={meetingDate} onChange={(e) => setMeetingDate(e.target.value)} className="input" />
           </div>
         </div>
 
@@ -110,6 +125,8 @@ export function ActaUploader() {
           <input
             id="attendees"
             name="attendees"
+            value={attendees}
+            onChange={(e) => setAttendees(e.target.value)}
             className="input"
             placeholder="Martín, Juanjo, Nico, Fer"
           />
@@ -128,7 +145,7 @@ export function ActaUploader() {
             value={content}
             onChange={(e) => setContent(e.target.value)}
             className="input resize-y font-mono text-xs leading-relaxed"
-            placeholder="Pega acá el acta que te devolvió la IA, incluyendo el bloque AUTO_PROCESSING…"
+            placeholder="Pega acá el acta completa que te devolvió la IA. Reconoce el formato actual (secciones numeradas y tareas NUEVA | …) y el antiguo bloque AUTO_PROCESSING."
           />
         </div>
 
@@ -159,8 +176,8 @@ export function ActaUploader() {
             <p className="text-sm text-white/40">Pega el acta para ver el desglose.</p>
           ) : !preview.hasBlock ? (
             <p className="rounded-lg bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-300">
-              El acta no trae bloque AUTO_PROCESSING. Se va a guardar igual, pero sin tareas
-              automáticas.
+              No se reconoció ningún formato de tareas (ni secciones con líneas «NUEVA | …» ni
+              bloque AUTO_PROCESSING). Se va a guardar igual, pero sin desglosar nada.
             </p>
           ) : (
             <div className="space-y-4">

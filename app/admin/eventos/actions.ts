@@ -164,3 +164,117 @@ export async function respondAvailability(formData: FormData) {
   revalidatePath("/admin/eventos");
   return { ok: true };
 }
+
+const InternalNotesSchema = z.object({
+  id: z.string().uuid(),
+  internal_notes: z.string().trim().max(4000),
+});
+
+/** Notas internas del evento: jamás se muestran en la web pública. */
+export async function saveInternalNotes(formData: FormData) {
+  await requireTeamMember(["socio", "lider_comunidad"]);
+
+  const parsed = InternalNotesSchema.safeParse({
+    id: formData.get("id"),
+    internal_notes: formData.get("internal_notes") ?? "",
+  });
+  if (!parsed.success) return { ok: false, error: "Datos inválidos" };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("events")
+    .update({ internal_notes: parsed.data.internal_notes || null })
+    .eq("id", parsed.data.id);
+  if (error) return { ok: false, error: "No se pudieron guardar las notas." };
+
+  revalidatePath(`/admin/eventos/${parsed.data.id}`);
+  return { ok: true };
+}
+
+export interface ImportResult {
+  ok: boolean;
+  error?: string;
+  imported?: number;
+  validated?: number;
+}
+
+/** Normaliza un encabezado del export para encontrar columnas sin pelear con tildes. */
+function normalizeHeader(value: string): string {
+  return value.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+}
+
+/**
+ * Importa el export de inscritos de Evently (.xlsx) a un evento.
+ *
+ * La "Fecha de Validación" del export es el check-in en la puerta: los
+ * inscritos con esa fecha son los que efectivamente llegaron. Reimportar el
+ * mismo archivo actualiza en vez de duplicar (upsert por ID de Evently).
+ */
+export async function importRegistrations(formData: FormData): Promise<ImportResult> {
+  await requireTeamMember(["socio", "lider_comunidad"]);
+
+  const eventId = z.string().uuid().safeParse(formData.get("event_id"));
+  if (!eventId.success) return { ok: false, error: "Evento inválido" };
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) return { ok: false, error: "Adjunta el .xlsx exportado desde Evently." };
+  if (file.size > 4 * 1024 * 1024) return { ok: false, error: "El archivo pesa más de 4 MB; no parece un export de Evently." };
+
+  const { readXlsxRows, excelSerialToIso } = await import("@/lib/xlsx-lite");
+  let rows: string[][];
+  try {
+    rows = readXlsxRows(Buffer.from(await file.arrayBuffer()));
+  } catch {
+    return { ok: false, error: "No pudimos leer el archivo. Exporta de nuevo desde Evently sin abrirlo en Excel." };
+  }
+  if (rows.length < 2) return { ok: false, error: "El archivo no trae inscritos." };
+
+  const header = rows[0].map(normalizeHeader);
+  const col = (name: string) => header.findIndex((h) => h.startsWith(name));
+  const idx = {
+    id: col("id"),
+    ci: col("ci"),
+    nombre: col("nombre"),
+    apellido: col("apellido"),
+    email: col("email"),
+    compra: col("fecha compra"),
+    ticket: col("tipo de ticket"),
+    estado: col("estado"),
+    origen: col("origen"),
+    validacion: col("fecha de validacion"),
+  };
+  if (idx.nombre === -1 || idx.validacion === -1) {
+    return { ok: false, error: "El archivo no calza con el export de Evently (faltan las columnas Nombre o Fecha de Validación)." };
+  }
+
+  const cell = (row: string[], i: number) => (i >= 0 ? (row[i] ?? "").trim() : "");
+  const records = rows.slice(1)
+    .filter((row) => cell(row, idx.nombre))
+    .map((row, i) => ({
+      event_id: eventId.data,
+      evently_id: cell(row, idx.id) || `fila-${i + 2}`,
+      ci: cell(row, idx.ci) || null,
+      first_name: cell(row, idx.nombre),
+      last_name: cell(row, idx.apellido) || null,
+      email: cell(row, idx.email).toLowerCase() || null,
+      ticket_type: cell(row, idx.ticket) || null,
+      status: cell(row, idx.estado) || null,
+      purchased_at: excelSerialToIso(cell(row, idx.compra)),
+      validated_at: excelSerialToIso(cell(row, idx.validacion)),
+      source: cell(row, idx.origen) || null,
+    }));
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("event_registrations")
+    .upsert(records, { onConflict: "event_id,evently_id" });
+  if (error) return { ok: false, error: "No se pudieron guardar los inscritos. ¿Corriste la migración 004?" };
+
+  revalidatePath(`/admin/eventos/${eventId.data}`);
+  revalidatePath("/admin/eventos");
+  return {
+    ok: true,
+    imported: records.length,
+    validated: records.filter((r) => r.validated_at).length,
+  };
+}

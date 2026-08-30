@@ -1,4 +1,6 @@
 import { requireTeamMember, isCurrentUserOwner } from "@/lib/auth";
+import { getPendingEvaluations } from "@/lib/evaluations";
+import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/admin/Sidebar";
 import { SignOutButton } from "@/components/admin/SignOutButton";
 import { headers } from "next/headers";
@@ -27,6 +29,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   const member = await requireTeamMember();
   const isOwner = await isCurrentUserOwner();
+
+  // Bloqueo post social run (decisión de Martín, 30-08): con una evaluación
+  // pendiente, TODO el ERP de esa persona queda cerrado salvo el propio
+  // formulario. Individual: cada uno destraba el suyo al entregar la suya.
+  const pendingEvaluations = await getPendingEvaluations(member.id);
+  if (pendingEvaluations.length > 0 && !pathname?.startsWith("/admin/evaluaciones")) {
+    redirect(`/admin/evaluaciones/${pendingEvaluations[0].id}`);
+  }
 
   return (
     <div className="flex min-h-dvh flex-col bg-stride-bg lg:flex-row">

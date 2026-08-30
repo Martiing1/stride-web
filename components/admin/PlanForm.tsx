@@ -95,6 +95,8 @@ export function PlanForm({
           <Users className="h-5 w-5 text-stride-cyan" /> Equipo en terreno
         </h2>
         <div className="grid gap-4 sm:grid-cols-3">
+          {people("Encargado de la planificación", "planner_id", plan?.planner_id ?? null)}
+          {people("Encargado de la ruta", "route_owner_id", plan?.route_owner_id ?? null)}
           {people("Lidera la corrida", "lead_id", plan?.lead_id ?? null)}
           {people("Cierra el grupo", "sweeper_id", plan?.sweeper_id ?? null)}
           {people("Registro y fotos", "photographer_id", plan?.photographer_id ?? null)}

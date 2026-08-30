@@ -92,6 +92,8 @@ export interface StrideEvent {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  /** Notas internas del equipo; jamás se muestran en la web pública. */
+  internal_notes?: string | null;
 }
 
 export interface EventAvailability {
@@ -234,6 +236,8 @@ export interface EventPlan {
   icebreaker: string | null;
   groups_notes: string | null;
   post_run_notes: string | null;
+  planner_id?: string | null;
+  route_owner_id?: string | null;
   lead_id: string | null;
   sweeper_id: string | null;
   photographer_id: string | null;

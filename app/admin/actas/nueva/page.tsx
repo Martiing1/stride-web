@@ -19,8 +19,9 @@ export default async function NuevaActaPage() {
         </Link>
         <h1 className="font-heading text-3xl font-extrabold text-white">Subir acta</h1>
         <p className="mt-1 max-w-2xl text-white/50">
-          Pega el acta completa tal como te la devolvió la IA. Si trae el bloque AUTO_PROCESSING, a
-          la derecha vas a ver exactamente qué tareas se van a crear antes de guardar.
+          Pega el acta completa tal como te la devolvió la IA. Título, fecha y asistentes se
+          rellenan solos desde el encabezado, y a la derecha ves exactamente qué tareas,
+          decisiones y seguimientos se van a crear antes de guardar.
         </p>
       </header>
 

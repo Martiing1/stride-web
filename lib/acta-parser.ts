@@ -40,7 +40,20 @@ export interface ParsedFollowup {
   content: string;
 }
 
+export interface ParsedHeader {
+  meetingDate: string | null; // ISO YYYY-MM-DD
+  timeLabel: string | null;
+  durationLabel: string | null;
+  attendees: string[];
+  location: string | null;
+  titleSuggestion: string | null;
+}
+
 export interface ParsedActa {
+  /** Con qué formato se entendió el acta. */
+  format: "auto_processing" | "erp_os" | "none";
+  /** Datos del encabezado (solo formato erp_os). */
+  header: ParsedHeader | null;
   hasBlock: boolean;
   catalogVersion: string | null;
   actaCode: string | null;
@@ -95,20 +108,12 @@ export function parseActa(content: string): ParsedActa {
   const endIdx = content.indexOf(END);
 
   if (startIdx === -1 || endIdx === -1 || endIdx < startIdx) {
-    return {
-      hasBlock: false,
-      catalogVersion: null,
-      actaCode: null,
-      areas: [],
-      tasks: [],
-      decisions: [],
-      followups: [],
-      rawBlock: null,
-      contentWithoutBlock: content.trim(),
-      warnings: startIdx === -1
-        ? ["El acta no trae bloque AUTO_PROCESSING: se guardará sin desglosar tareas."]
-        : ["El bloque AUTO_PROCESSING está incompleto (falta AUTO_PROCESSING_END)."],
-    };
+    if (startIdx !== -1) {
+      warnings.push("El bloque AUTO_PROCESSING está incompleto (falta AUTO_PROCESSING_END).");
+    }
+    // Formato vigente desde 2026-08: sin bloque técnico, con secciones numeradas
+    // y las tareas en líneas "NUEVA | …" bajo "Formato de registro en ERP/OS".
+    return parseErpOsActa(content, warnings);
   }
 
   const rawBlock = content.slice(startIdx, endIdx + END.length);
@@ -193,6 +198,8 @@ export function parseActa(content: string): ParsedActa {
   }
 
   return {
+    format: "auto_processing",
+    header: null,
     hasBlock: true,
     catalogVersion,
     actaCode,
@@ -233,4 +240,165 @@ export function resolveAssignee(
   });
 
   return matches.length === 1 ? matches[0].id : null;
+}
+
+// ─── Formato "ERP/OS" (vigente desde 2026-08) ────────────────────────────────
+//
+// El acta viene como documento estructurado: encabezado en tabla (Fecha, Hora,
+// Duración, Participantes, Ubicación), secciones numeradas (1. RESUMEN … 7.
+// NOTAS) y, dentro de "5. TAREAS", un bloque "Formato de registro en ERP/OS:"
+// con una línea por tarea:
+//
+//   NUEVA | <descripción> | <responsable> | <DD/MM/YYYY> | <prioridad> | <categoría>
+//
+// Al pegar desde Word/Docs las celdas de tabla llegan como tabs o como "|";
+// todo se normaliza antes de leer.
+
+const SECTION_HEADING = /^\s*\d+\s*[.)]\s+[A-ZÁÉÍÓÚÑ]/;
+
+function cleanCell(value: string): string {
+  return value.replace(/^[|\s•·\-–]+/, "").replace(/[|\s]+$/, "").trim();
+}
+
+/** Busca el valor de un campo del encabezado ("Fecha:", "Participantes:", …). */
+function headerField(lines: string[], key: RegExp): string | null {
+  const KEYS = /^(fecha|hora|duraci[oó]n|participantes|ubicaci[oó]n|reuni[oó]n\s*n)/i;
+  for (let i = 0; i < Math.min(lines.length, 60); i++) {
+    const line = cleanCell(lines[i]);
+    const match = line.match(key);
+    if (!match) continue;
+
+    // Valor en la misma línea, después de los dos puntos…
+    const inline = cleanCell(line.slice(match[0].length).replace(/^:/, ""));
+    if (inline) return inline;
+
+    // …o en las celdas siguientes, hasta toparse con otra clave o una sección.
+    const parts: string[] = [];
+    for (let j = i + 1; j < Math.min(lines.length, i + 6); j++) {
+      const next = cleanCell(lines[j]);
+      if (!next) continue;
+      if (KEYS.test(next) || SECTION_HEADING.test(next)) break;
+      parts.push(next);
+      // Los campos cortos (fecha, hora) viven en una sola celda.
+      if (!/participantes/i.test(match[0])) break;
+    }
+    const joined = parts.join(" ").trim();
+    return joined || null;
+  }
+  return null;
+}
+
+/** Junta las líneas de una sección numerada hasta el siguiente encabezado. */
+function sectionLines(lines: string[], heading: RegExp): string[] {
+  const start = lines.findIndex((l) => heading.test(cleanCell(l)));
+  if (start === -1) return [];
+  const out: string[] = [];
+  for (let i = start + 1; i < lines.length; i++) {
+    const line = cleanCell(lines[i]);
+    if (SECTION_HEADING.test(line) || /^formato de registro/i.test(line)) break;
+    if (line) out.push(line);
+  }
+  return out;
+}
+
+function parseErpOsActa(content: string, warnings: string[]): ParsedActa {
+  // Tabs de tablas pegadas desde Word → mismo separador que el formato escrito.
+  const normalized = content.replace(/\t+/g, " | ");
+  const lines = normalized.split(/\r?\n/);
+
+  // --- Tareas: líneas "NUEVA | …" ---
+  const tasks: ParsedTask[] = [];
+  const taskLineIdx: number[] = [];
+  lines.forEach((raw, i) => {
+    const line = cleanCell(raw);
+    if (!/^NUEVA\s*\|/i.test(line)) return;
+    taskLineIdx.push(i);
+
+    const parts = line.split("|").map((p) => p.trim()).filter((p, idx) => idx === 0 || p !== "");
+    // [NUEVA, descripción…, responsable, fecha, prioridad, categoría]
+    if (parts.length < 6) {
+      warnings.push(`Línea NUEVA incompleta, se omitió: "${line}"`);
+      return;
+    }
+    const tail = parts.slice(-4); // responsable, fecha, prioridad, categoría
+    const title = parts.slice(1, parts.length - 4).join(" | ");
+    tasks.push({
+      actaCode: "",
+      assigneeLabel: tail[0],
+      dueDate: parseDate(tail[1], warnings, `tarea "${title}"`),
+      priority: normalizePriority(tail[2], warnings, "NUEVA"),
+      area: tail[3] || "general",
+      title,
+    });
+  });
+
+  // --- Decisiones y seguimientos desde las secciones numeradas ---
+  const decisions: ParsedDecision[] = sectionLines(lines, /^\d+\s*[.)]\s+DECISIONES/i).map(
+    (line) => ({ area: "general", kind: "decision", priority: "media" as Priority, content: line, isDocUpdate: false })
+  );
+  const followups: ParsedFollowup[] = sectionLines(lines, /^\d+\s*[.)]\s+SEGUIMIENTO/i).map(
+    (line) => ({ area: "general", content: line })
+  );
+
+  // --- Encabezado ---
+  const dateLabel = headerField(lines, /^fecha\b:?/i);
+  const meetingDate = dateLabel ? parseDate(dateLabel.match(/\d{1,2}\/\d{1,2}\/\d{4}/)?.[0], [], "encabezado") : null;
+  const attendeesRaw = headerField(lines, /^participantes\b:?/i) ?? "";
+  const attendees = attendeesRaw
+    .split(/[,;]| y /i)
+    .map((a) => a.trim())
+    .filter((a) => a && a.length < 60);
+
+  let titleSuggestion: string | null = null;
+  const actaHeadingIdx = lines.findIndex((l) => /ACTA DE REUNI[ÓO]N/i.test(l));
+  for (let i = actaHeadingIdx + 1; i >= 0 && i < Math.min(lines.length, actaHeadingIdx + 5); i++) {
+    const line = cleanCell(lines[i]);
+    if (line && !/ACTA DE REUNI/i.test(line) && !/^(fecha|hora|duraci)/i.test(line)) {
+      titleSuggestion = line;
+      break;
+    }
+  }
+
+  const header: ParsedHeader = {
+    meetingDate,
+    timeLabel: headerField(lines, /^hora\b:?/i),
+    durationLabel: headerField(lines, /^duraci[oó]n\b:?/i),
+    attendees,
+    location: headerField(lines, /^ubicaci[oó]n\b:?/i),
+    titleSuggestion,
+  };
+
+  // --- Bloque técnico fuera de la vista legible ---
+  let rawBlock: string | null = null;
+  let contentWithoutBlock = content.trim();
+  if (taskLineIdx.length > 0) {
+    const blockStart = lines.findIndex((l) => /^formato de registro/i.test(cleanCell(l)));
+    const from = blockStart !== -1 ? blockStart : taskLineIdx[0];
+    const to = taskLineIdx[taskLineIdx.length - 1];
+    rawBlock = lines.slice(from, to + 1).join("\n");
+    contentWithoutBlock = [...lines.slice(0, from), ...lines.slice(to + 1)].join("\n").trim();
+  }
+
+  const actaCode = meetingDate ? `ACTA_STRIDE_${meetingDate.replace(/-/g, "")}` : null;
+  const found = tasks.length + decisions.length + followups.length > 0;
+  if (!found) {
+    warnings.push(
+      "No se reconoció ningún formato: ni bloque AUTO_PROCESSING ni líneas 'NUEVA | …'. Se guardará sin desglosar."
+    );
+  }
+
+  return {
+    format: found ? "erp_os" : "none",
+    header,
+    hasBlock: found,
+    catalogVersion: null,
+    actaCode,
+    areas: Array.from(new Set(tasks.map((t) => t.area))),
+    tasks: tasks.map((t) => ({ ...t, actaCode: actaCode ?? "" })),
+    decisions,
+    followups,
+    rawBlock,
+    contentWithoutBlock,
+    warnings,
+  };
 }
