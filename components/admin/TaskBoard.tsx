@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState, useTransition, type DragEvent, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Plus, Loader2, X, ListTodo, Check, Columns3, Rows3, CalendarDays, UserRound, Tag, FileText, Lock } from "lucide-react";
-import { updateTaskStatus, createTask, updateTaskNotes } from "@/app/admin/tareas/actions";
+import { Plus, Loader2, X, ListTodo, Check, Columns3, Rows3, CalendarDays, UserRound, Tag, FileText, Lock, History } from "lucide-react";
+import { updateTaskStatus, createTask, updateTaskNotes, updateTask, getTaskHistory, type TaskHistoryEntry } from "@/app/admin/tareas/actions";
 import type { Task, TeamMember, TaskStatus } from "@/lib/types";
 
 const STATUS_ORDER: TaskStatus[] = ["pendiente", "en_progreso", "bloqueada", "recurrente", "hecha"];
@@ -53,6 +53,8 @@ export function TaskBoard({
   const [openTask, setOpenTask] = useState<Task | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
   const [noteSaved, setNoteSaved] = useState(false);
+  const [draft, setDraft] = useState({ title: "", assignee_id: "", area: "", priority: "media", due_date: "", visibility: "equipo" });
+  const [history, setHistory] = useState<TaskHistoryEntry[] | null>(null);
   // Filtros locales: los datos ya están cargados, no hace falta otro viaje.
   const [priorityFilter, setPriorityFilter] = useState("todas");
   const [areaFilter, setAreaFilter] = useState("todas");
@@ -121,6 +123,36 @@ export function TaskBoard({
     setOpenTask(task);
     setNoteDraft(task.description ?? "");
     setNoteSaved(false);
+    setDraft({
+      title: task.title,
+      assignee_id: task.assignee_id ?? "",
+      area: task.area ?? "",
+      priority: task.priority,
+      due_date: task.due_date ?? "",
+      visibility: task.visibility ?? "equipo",
+    });
+    setHistory(null);
+    const form = new FormData();
+    form.set("id", task.id);
+    void getTaskHistory(form).then((res) => setHistory(res.entries));
+  }
+
+  function saveEdit() {
+    if (!openTask) return;
+    const form = new FormData();
+    form.set("id", openTask.id);
+    form.set("title", draft.title);
+    form.set("assignee_id", draft.assignee_id);
+    form.set("area", draft.area);
+    form.set("priority", draft.priority);
+    form.set("due_date", draft.due_date);
+    form.set("visibility", draft.visibility);
+    startTransition(async () => {
+      const res = await updateTask(form);
+      if (!res.ok) { setError(res.error ?? "No se pudo guardar."); return; }
+      setOpenTask(null);
+      router.refresh();
+    });
   }
 
   function saveNote() {
@@ -345,19 +377,76 @@ export function TaskBoard({
         </div>
       )}
 
-      {/* Popup de detalle */}
+      {/* Popup de detalle: editable para staff, con historial de cambios */}
       {openTask && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setOpenTask(null)} role="dialog" aria-modal="true">
-          <div className="w-full max-w-lg rounded-3xl border border-white/10 bg-stride-card p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-white/10 bg-stride-card p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-4">
-              <h2 className="font-heading text-xl font-bold text-white">
-                {openTask.visibility === "socios" && <Lock className="mr-1.5 inline h-4 w-4 text-stride-amber" aria-label="Solo socios" />}
-                {openTask.title}
-              </h2>
+              <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-white/35">
+                {openTask.visibility === "socios" && <Lock className="h-3.5 w-3.5 text-stride-amber" />} Tarea
+              </p>
               <button type="button" onClick={() => setOpenTask(null)} aria-label="Cerrar" className="rounded-lg p-1.5 text-white/40 hover:text-white">
                 <X className="h-4 w-4" />
               </button>
             </div>
+
+            {canCreate ? (
+              <div className="mt-3 space-y-4">
+                <div>
+                  <label htmlFor="edit-title" className="label">Tarea</label>
+                  <textarea id="edit-title" rows={2} value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} className="input resize-none text-sm" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label htmlFor="edit-assignee" className="label">Responsable</label>
+                    <select id="edit-assignee" value={draft.assignee_id} onChange={(e) => setDraft({ ...draft, assignee_id: e.target.value })} className="input py-2 text-sm">
+                      <option value="" className="bg-stride-card">Sin asignar</option>
+                      {team.map((t) => (
+                        <option key={t.id} value={t.id} className="bg-stride-card">{t.nickname ?? t.full_name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="edit-due" className="label">Fecha límite</label>
+                    <input id="edit-due" type="date" value={draft.due_date} onChange={(e) => setDraft({ ...draft, due_date: e.target.value })} className="input py-2 text-sm" />
+                  </div>
+                  <div>
+                    <label htmlFor="edit-priority" className="label">Prioridad</label>
+                    <select id="edit-priority" value={draft.priority} onChange={(e) => setDraft({ ...draft, priority: e.target.value })} className="input py-2 text-sm">
+                      <option value="alta" className="bg-stride-card">Alta</option>
+                      <option value="media" className="bg-stride-card">Media</option>
+                      <option value="baja" className="bg-stride-card">Baja</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="edit-area" className="label">Área</label>
+                    <input id="edit-area" value={draft.area} onChange={(e) => setDraft({ ...draft, area: e.target.value })} className="input py-2 text-sm" placeholder="Operaciones" />
+                  </div>
+                </div>
+                {isSocio && (
+                  <label className="flex w-fit cursor-pointer items-center gap-2.5 rounded-xl border border-white/10 px-4 py-2.5 text-sm text-white/70">
+                    <input type="checkbox" checked={draft.visibility === "socios"} onChange={(e) => setDraft({ ...draft, visibility: e.target.checked ? "socios" : "equipo" })} className="h-4 w-4 accent-[#7C3AED]" />
+                    <Lock className="h-3.5 w-3.5 text-stride-amber" /> Solo socios
+                  </label>
+                )}
+                <button type="button" onClick={saveEdit} disabled={pending} className="btn-primary px-5 py-2.5 text-sm">
+                  {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Check className="h-4 w-4" /> Guardar cambios</>}
+                </button>
+              </div>
+            ) : (
+              <div className="mt-3">
+                <h2 className="font-heading text-xl font-bold text-white">{openTask.title}</h2>
+                <dl className="mt-4 space-y-2.5 text-sm">
+                  <div className="flex items-center gap-2.5"><UserRound className="h-4 w-4 shrink-0 text-white/30" /><dt className="text-white/40">Responsable</dt><dd className="font-semibold text-white">{nameOf(openTask)}</dd></div>
+                  {openTask.area && <div className="flex items-center gap-2.5"><Tag className="h-4 w-4 shrink-0 text-white/30" /><dt className="text-white/40">Área</dt><dd className="text-white/80">{openTask.area}</dd></div>}
+                  <div className="flex items-center gap-2.5"><CalendarDays className="h-4 w-4 shrink-0 text-white/30" /><dt className="text-white/40">Fecha límite</dt><dd className="text-white/80">{openTask.due_date ? openTask.due_date.split("-").reverse().join("/") : "Sin fecha"}</dd></div>
+                </dl>
+              </div>
+            )}
+
+            {openTask.meeting_id && (
+              <p className="mt-3 flex items-center gap-2 text-sm"><FileText className="h-4 w-4 text-white/30" /><a href={`/admin/actas/${openTask.meeting_id}`} className="text-stride-cyan hover:underline">Ver acta de origen</a></p>
+            )}
 
             <div className="mt-4">
               <label htmlFor="task-notes" className="label">Notas</label>
@@ -382,16 +471,9 @@ export function TaskBoard({
               </div>
             </div>
 
-            <dl className="mt-5 space-y-2.5 text-sm">
-              <div className="flex items-center gap-2.5"><UserRound className="h-4 w-4 shrink-0 text-white/30" /><dt className="text-white/40">Responsable</dt><dd className="font-semibold text-white">{nameOf(openTask)}</dd></div>
-              {openTask.area && <div className="flex items-center gap-2.5"><Tag className="h-4 w-4 shrink-0 text-white/30" /><dt className="text-white/40">Área</dt><dd className="text-white/80">{openTask.area}</dd></div>}
-              <div className="flex items-center gap-2.5"><CalendarDays className="h-4 w-4 shrink-0 text-white/30" /><dt className="text-white/40">Fecha límite</dt><dd className={openTask.due_date && openTask.due_date < today && openTask.status !== "hecha" ? "font-semibold text-red-400" : "text-white/80"}>{openTask.due_date ? openTask.due_date.split("-").reverse().join("/") : "Sin fecha"}</dd></div>
-              {openTask.meeting_id && <div className="flex items-center gap-2.5"><FileText className="h-4 w-4 shrink-0 text-white/30" /><dt className="text-white/40">Origen</dt><dd><a href={`/admin/actas/${openTask.meeting_id}`} className="text-stride-cyan hover:underline">Ver acta</a></dd></div>}
-            </dl>
-
-            <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-white/5 pt-5">
+            <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-white/5 pt-4">
               {openTask.status !== "hecha" && (
-                <button type="button" onClick={() => changeStatus(openTask.id, "hecha")} disabled={pending} className="btn-primary">
+                <button type="button" onClick={() => changeStatus(openTask.id, "hecha")} disabled={pending} className="btn-primary px-5 py-2.5 text-sm">
                   {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Check className="h-4 w-4" /> Marcar como hecha</>}
                 </button>
               )}
@@ -402,10 +484,33 @@ export function TaskBoard({
                 aria-label="Cambiar estado"
                 className="input w-auto py-2 text-sm"
               >
-                {STATUS_ORDER.map((s) => (
-                  <option key={s} value={s} className="bg-stride-card">{statusLabels[s] ?? s}</option>
+                {STATUS_ORDER.map((st) => (
+                  <option key={st} value={st} className="bg-stride-card">{statusLabels[st] ?? st}</option>
                 ))}
               </select>
+            </div>
+
+            {/* Historial de cambios */}
+            <div className="mt-5 border-t border-white/5 pt-4">
+              <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-white/40">
+                <History className="h-3.5 w-3.5" /> Historial
+              </p>
+              {history === null ? (
+                <p className="mt-2 text-xs text-white/30">Cargando…</p>
+              ) : history.length === 0 ? (
+                <p className="mt-2 text-xs text-white/30">Sin cambios registrados aún.</p>
+              ) : (
+                <ul className="mt-2 max-h-44 space-y-1.5 overflow-y-auto pr-1">
+                  {history.map((entry, i) => (
+                    <li key={i} className="text-xs leading-relaxed text-white/50">
+                      <span className="font-semibold text-white/70">{entry.who}</span> cambió {entry.field}
+                      {entry.old_value ? <> de «{entry.old_value.slice(0, 40)}»</> : null}
+                      {entry.new_value ? <> a «{entry.new_value.slice(0, 40)}»</> : <> (lo dejó vacío)</>}
+                      <span className="text-white/30"> · {new Date(entry.created_at).toLocaleString("es-CL", { timeZone: "America/Santiago", dateStyle: "short", timeStyle: "short" })}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
         </div>
