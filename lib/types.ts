@@ -49,6 +49,8 @@ export interface Task {
   event_id: string | null;
   created_at: string;
   updated_at: string;
+  /** "socios" = solo fundadores (RLS lo blinda, migración 008). */
+  visibility?: "equipo" | "socios";
 }
 
 export interface Decision {

@@ -51,7 +51,7 @@ const NewTaskSchema = z.object({
 });
 
 export async function createTask(formData: FormData) {
-  await requireTeamMember(["socio", "lider_comunidad"]);
+  const member = await requireTeamMember(["socio", "lider_comunidad"]);
 
   const parsed = NewTaskSchema.safeParse({
     title: formData.get("title"),
@@ -66,6 +66,8 @@ export async function createTask(formData: FormData) {
   }
 
   const d = parsed.data;
+  // "Solo socios" únicamente la puede marcar un socio; nadie más la vería igual.
+  const visibility = formData.get("visibility") === "socios" && member.role === "socio" ? "socios" : "equipo";
   const supabase = await createClient();
 
   const { error } = await supabase.from("tasks").insert({
@@ -75,6 +77,7 @@ export async function createTask(formData: FormData) {
     priority: d.priority,
     due_date: d.due_date || null,
     status: "pendiente",
+    visibility,
   });
 
   if (error) return { ok: false, error: "No se pudo crear la tarea." };

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition, type DragEvent, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Plus, Loader2, X, ListTodo, Check, Columns3, Rows3, CalendarDays, UserRound, Tag, FileText } from "lucide-react";
+import { Plus, Loader2, X, ListTodo, Check, Columns3, Rows3, CalendarDays, UserRound, Tag, FileText, Lock } from "lucide-react";
 import { updateTaskStatus, createTask, updateTaskNotes } from "@/app/admin/tareas/actions";
 import type { Task, TeamMember, TaskStatus } from "@/lib/types";
 
@@ -27,6 +27,7 @@ export function TaskBoard({
   team,
   currentMemberId,
   canCreate,
+  isSocio,
   today,
   activeAssignee,
   activeStatus,
@@ -36,6 +37,7 @@ export function TaskBoard({
   team: TeamMember[];
   currentMemberId: string;
   canCreate: boolean;
+  isSocio: boolean;
   today: string;
   activeAssignee: string;
   activeStatus: string;
@@ -233,6 +235,12 @@ export function TaskBoard({
               <input id="due_date" name="due_date" type="date" className="input" />
             </div>
           </div>
+          {isSocio && (
+            <label className="flex w-fit cursor-pointer items-center gap-2.5 rounded-xl border border-white/10 px-4 py-2.5 text-sm text-white/70">
+              <input type="checkbox" name="visibility" value="socios" className="h-4 w-4 accent-[#7C3AED]" />
+              <Lock className="h-3.5 w-3.5 text-stride-amber" /> Solo socios (tú y JJ; el resto del equipo ni la ve)
+            </label>
+          )}
           <button type="submit" disabled={saving} className="btn-primary">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Crear tarea"}
           </button>
@@ -254,7 +262,10 @@ export function TaskBoard({
               <li key={task.id}>
                 <button type="button" onClick={() => openDetail(task)} className={`card flex w-full flex-wrap items-center gap-4 py-4 text-left transition hover:border-white/20 ${overdue ? "border-red-500/30" : ""}`}>
                   <div className="min-w-[200px] flex-1">
-                    <p className={`text-sm ${task.status === "hecha" ? "text-white/40 line-through" : "text-white"}`}>{task.title}</p>
+                    <p className={`text-sm ${task.status === "hecha" ? "text-white/40 line-through" : "text-white"}`}>
+                      {task.visibility === "socios" && <Lock className="mr-1.5 inline h-3 w-3 text-stride-amber" aria-label="Solo socios" />}
+                      {task.title}
+                    </p>
                     <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/40">
                       <span className="inline-flex items-center gap-1.5 rounded-full bg-white/5 px-2 py-0.5 font-semibold text-white/70">
                         <UserRound className="h-3 w-3" /> {nameOf(task)}
@@ -311,7 +322,10 @@ export function TaskBoard({
                           onClick={() => openDetail(task)}
                           className={`w-full cursor-grab rounded-xl border border-white/5 bg-stride-card p-3 text-left text-sm transition hover:border-white/20 active:cursor-grabbing ${overdue ? "border-red-500/30" : ""}`}
                         >
-                          <p className={task.status === "hecha" ? "text-white/40 line-through" : "text-white"}>{task.title}</p>
+                          <p className={task.status === "hecha" ? "text-white/40 line-through" : "text-white"}>
+                            {task.visibility === "socios" && <Lock className="mr-1 inline h-3 w-3 text-stride-amber" aria-label="Solo socios" />}
+                            {task.title}
+                          </p>
                           <p className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-white/40">
                             <span className="rounded-full bg-white/5 px-1.5 py-0.5 font-semibold text-white/65">{nameOf(task)}</span>
                             <span className={`rounded-full px-1.5 py-0.5 font-semibold ${PRIORITY_STYLES[task.priority]}`}>{task.priority}</span>
@@ -336,7 +350,10 @@ export function TaskBoard({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setOpenTask(null)} role="dialog" aria-modal="true">
           <div className="w-full max-w-lg rounded-3xl border border-white/10 bg-stride-card p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between gap-4">
-              <h2 className="font-heading text-xl font-bold text-white">{openTask.title}</h2>
+              <h2 className="font-heading text-xl font-bold text-white">
+                {openTask.visibility === "socios" && <Lock className="mr-1.5 inline h-4 w-4 text-stride-amber" aria-label="Solo socios" />}
+                {openTask.title}
+              </h2>
               <button type="button" onClick={() => setOpenTask(null)} aria-label="Cerrar" className="rounded-lg p-1.5 text-white/40 hover:text-white">
                 <X className="h-4 w-4" />
               </button>

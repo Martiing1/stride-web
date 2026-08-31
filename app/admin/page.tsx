@@ -94,7 +94,7 @@ export default async function AdminDashboard({
   // Widgets configurables desde /admin/configuracion, en el orden elegido.
   const catalogue: Record<WidgetId, { label: string; value: number; icon: typeof ListTodo; href: string; alert?: boolean; staffOnly?: boolean; ownerOnly?: boolean }> = {
     tareas_abiertas: { label: "Mis tareas abiertas", value: myOpenTasks, icon: ListTodo, href: "/admin/tareas" },
-    tareas_vencidas: { label: "Tareas vencidas", value: overdueTasks, icon: AlertTriangle, href: "/admin/tareas", alert: overdueTasks > 0 },
+    tareas_vencidas: { label: "Tareas vencidas", value: overdueTasks, icon: AlertTriangle, href: "/admin/tareas?responsable=todos", alert: overdueTasks > 0 },
     asistencia_mes: { label: "Asistentes a social runs este mes", value: attendance, icon: Footprints, href: "/admin/eventos" },
     miembros_activos: { label: "Miembros activos", value: activeMembers, icon: IdCard, href: "/admin/miembros", staffOnly: true, ownerOnly: true },
     leads_nuevos: { label: "Leads sin contactar", value: newLeads, icon: UserPlus, href: "/admin/leads", staffOnly: true },
