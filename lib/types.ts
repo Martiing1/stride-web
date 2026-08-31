@@ -172,6 +172,8 @@ export interface Benefit {
   /** Coordenadas del local (migración 006), para cruzar escaneos. */
   lat?: number | null;
   lng?: number | null;
+  /** Nota visible SOLO dentro del carnet (códigos de descuento, etc.). */
+  member_note?: string | null;
 }
 
 export interface Scan {

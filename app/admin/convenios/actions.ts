@@ -19,6 +19,7 @@ const BenefitSchema = z.object({
   instagram: z.string().trim().max(80),
   sort_order: z.string().max(4),
   location: z.string().trim().max(500),
+  member_note: z.string().trim().max(300),
 });
 
 /**
@@ -49,6 +50,7 @@ function toRow(d: z.infer<typeof BenefitSchema>) {
     instagram: d.instagram ? d.instagram.replace(/^@/, "") : null,
     sort_order: d.sort_order ? Number(d.sort_order) : 0,
     // Ubicación vacía = borrar coordenadas; texto sin coordenadas legibles = conservar nada.
+    member_note: d.member_note || null,
     lat: d.location ? parseCoords(d.location)?.lat ?? null : null,
     lng: d.location ? parseCoords(d.location)?.lng ?? null : null,
   };
@@ -64,6 +66,7 @@ function parse(formData: FormData) {
     instagram: formData.get("instagram") ?? "",
     sort_order: formData.get("sort_order") ?? "",
     location: formData.get("location") ?? "",
+    member_note: formData.get("member_note") ?? "",
   });
 }
 

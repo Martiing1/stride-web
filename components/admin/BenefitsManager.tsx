@@ -155,8 +155,14 @@ function BenefitForm({
       </div>
 
       <div>
-        <label htmlFor="description" className="label">Qué obtiene el miembro</label>
+        <label htmlFor="description" className="label">Qué obtiene el miembro (público, se ve en /one)</label>
         <textarea id="description" name="description" required rows={3} defaultValue={benefit?.description} className="input resize-y" placeholder="20% de descuento en toda la carta, de lunes a viernes." />
+      </div>
+
+      <div>
+        <label htmlFor="member_note" className="label">Nota solo para miembros (se ve únicamente en el carnet)</label>
+        <input id="member_note" name="member_note" defaultValue={benefit?.member_note ?? ""} className="input" placeholder="Tu código: STRIDE10 — úsalo al pagar." />
+        <p className="mt-1 text-xs text-white/35">Códigos de descuento y detalles que no deben quedar públicos.</p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
