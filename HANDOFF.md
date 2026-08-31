@@ -1,6 +1,6 @@
 # STRIDE — Estado del proyecto
 
-> Documento de traspaso. Actualizado: **2026-08-30**, tras el rediseño ERP v2 completo.
+> Documento de traspaso. Actualizado: **2026-08-31**.
 > Lee también `README.md` (setup, marca, posicionamiento).
 
 ---
@@ -39,8 +39,11 @@ Un solo proyecto sirve el sitio público y el ERP.
 
 ### ERP — módulos
 
-**Operaciones:** Dashboard (widgets configurables) · Tareas (lista + Kanban con
-arrastre, filtros, popup de detalle) · Actas (lector del formato real, autorrelleno)
+**Operaciones:** Dashboard (widgets configurables) · Tareas (lista + Kanban,
+filtro propio por defecto, popup de edición completa con historial de cambios,
+visibilidad solo-socios con candado y filtro, eliminar solo socios, archivo
+automático de hechas +30 días) · Actas (lector del formato real, autorrelleno,
+tareas editables antes de guardar con candado solo-socios por tarea)
 **Social Run:** Eventos (autocompletar desde Evently, notas internas, import de
 inscritos .xlsx) · Planificaciones (plantilla real por bloques, calculadora de
 salidas escalonadas, checklist) · Rutas (GPX con previsualización SVG) ·
@@ -50,7 +53,9 @@ mes a mes, quiénes más van)
 · Escaneos (cruce con locales por coordenadas) · Convenios (CRUD + coordenadas) ·
 Leads (Kanban 5 columnas + temperatura) · Testimonios (CRUD + publicar)
 **Recursos:** Documentos (Drive TEAM STRIDE embebido) · Kits (CRUD, stock,
-paquetes, entregas) · Finanzas (dashboard + churn, libro diario, presupuestos)
+paquetes, entregas) · Finanzas (tres tipos: ingreso/costo/gasto, catálogo de categorías y
+subcategorías, área de negocio por movimiento, libro diario con saldo,
+presupuestos mensuales/trimestrales, churn)
 **Configuración:** Equipo (CRUD + fotos) · Configuración (permisos por rol,
 widgets, nombres de columnas) · Seguridad (TOTP + foto propia)
 
@@ -69,12 +74,14 @@ entregue SU evaluación. "No asistí" también desbloquea. Decisión de Martín,
 
 ### Supabase — proyecto `stride`, ref `onljegsllbkvqbkeqbtt`
 
-Migraciones aplicadas, en orden: `schema.sql`, `seed.sql`, `migration-002-erp.sql`,
-`migration-003-member-portal.sql`, `migration-004-erp-v2.sql` (inscritos,
-evaluaciones, planificación, notas internas), `migration-005-erp-v2-fase2.sql`
-(app_settings, fotos de equipo, leads agendado+temperatura),
-`migration-006-erp-v2-fase4.sql` (presupuestos, paquetes de kits, coordenadas de
-convenios). Todas verificadas en la base el 30-08.
+Migraciones aplicadas, en orden: `schema.sql`, `seed.sql`, `002-erp`,
+`003-member-portal`, `004-erp-v2` (inscritos, evaluaciones, planificación),
+`005-erp-v2-fase2` (app_settings, fotos, leads), `006-erp-v2-fase4`
+(presupuestos, paquetes, coordenadas), `007-finanzas-categorias` (tipo costo,
+catálogo, áreas — la vista mensual se recrea con drop, no or-replace),
+`008-tareas-v2` (visibilidad solo-socios, blindada en RLS) y
+`009-tareas-historial` (task_audit_log, hereda la visibilidad de la tarea).
+Todas verificadas en la base.
 
 Buckets: `rutas` (público), `comprobantes` (privado), `member-photos` (privado,
 URL firmada 300 s), `team-photos` (privado, URL firmada 600 s).
@@ -87,8 +94,12 @@ Auth: SMTP propio vía Resend (smtp.resend.com, remitente
 
 ### Vercel — proyecto `stride-web`
 
-Deploy: `cd web && npx vercel deploy --prod` (el repo GitHub sigue desconectado a
-propósito). Variables en Production y Preview: las de Supabase +
+Deploy: `cd web && npx vercel deploy --prod`. El código vive en GitHub
+`Martiing1/stride-web` (main = ERP; la landing vieja quedó en la rama
+`landing-antigua`), pero Vercel está DESCONECTADO del repo a propósito: el
+deploy es siempre manual desde la carpeta local. El keychain local autentica
+como `fincore08-ai` (solo lectura): para push se usa un token temporal de
+Martiing1 que se revoca después. Variables en Production y Preview: las de Supabase +
 `RESEND_API_KEY`, `LEADS_NOTIFY_FROM/TO`, `QR_SIGNING_SECRET`,
 `GOOGLE_CLIENT_ID/SECRET/REFRESH_TOKEN`, `GOOGLE_DRIVE_ROOT_FOLDER`.
 Ojo: `QR_SIGNING_SECRET` de producción y el local son distintos a propósito
@@ -116,9 +127,10 @@ puerta y alimenta Métricas y el widget de asistencia del dashboard.
 
 ## Qué falta (todo del lado de contenido/operación)
 
-1. **Accesos del equipo: 1 de 9.** Los 7 `PENDIENTE-*@stride.local` necesitan
-   correo real (Configuración → Equipo lo edita); Juanjo necesita usuario en
-   Supabase Auth + su UID en `team_members.auth_user_id`.
+1. **Accesos del equipo: 2 de 9** (Martín y Juanjo, ambos socios). Los 7
+   `PENDIENTE-*@stride.local` necesitan correo real (Equipo lo edita) + usuario
+   en Supabase Auth + UID en `team_members.auth_user_id`. El flujo de estreno:
+   contraseña temporal por WhatsApp → Seguridad → cambiar contraseña + TOTP.
 2. **Miembros reales: 0.** Solo "Miembro de prueba" (vence 2026-08-31). El alta
    real: Miembros → Nuevo → Enviar invitación (sale por Resend con enlace+código).
 3. **Convenios:** los 6 sin coordenadas (pegar link de Maps en cada uno para el
