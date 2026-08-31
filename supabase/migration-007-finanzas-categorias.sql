@@ -41,7 +41,10 @@ create policy "socios gestionan categorias"
   on finance_categories for all using (is_socio()) with check (is_socio());
 
 -- --- La vista mensual aprende a separar costos ------------------------------
-create or replace view monthly_finance_summary as
+-- Se recrea (no "or replace"): agregar la columna de costos cambia la forma
+-- de la vista y Postgres no lo permite en caliente.
+drop view if exists monthly_finance_summary;
+create view monthly_finance_summary as
 select
   date_trunc('month', occurred_on)::date                        as month,
   sum(amount_clp) filter (where kind = 'ingreso')               as ingresos,
