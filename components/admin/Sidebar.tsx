@@ -7,7 +7,7 @@ import { useState } from "react";
 import {
   LayoutDashboard, ListTodo, FileText, CalendarDays, IdCard, ScanLine, UserPlus,
   Package, Wallet, Users, HeartHandshake, ClipboardList, Map, CalendarCheck,
-  MessageSquareQuote, ClipboardCheck, ShieldCheck, Settings, Menu, X, UserRound, HardDrive, BarChart3,
+  MessageSquareQuote, ClipboardCheck, ShieldCheck, Settings, Menu, X, UserRound, HardDrive, BarChart3, BookLock, Gauge,
 } from "lucide-react";
 import { ROLE_LABELS } from "@/lib/roles";
 import type { Role } from "@/lib/types";
@@ -33,6 +33,8 @@ const ICONS: Record<string, typeof LayoutDashboard> = {
   "/admin/kits": Package,
   "/admin/finanzas": Wallet,
   "/admin/equipo": Users,
+  "/admin/desempeno": Gauge,
+  "/admin/incumplimientos": BookLock,
   "/admin/configuracion": Settings,
   "/admin/seguridad": ShieldCheck,
 };

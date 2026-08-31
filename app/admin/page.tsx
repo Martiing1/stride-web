@@ -3,6 +3,7 @@ import { ListTodo, IdCard, ScanLine, UserPlus, AlertTriangle, ArrowRight, Shield
 import { requireTeamMember, isStaff, isCurrentUserOwner } from "@/lib/auth";
 import { type WidgetId } from "@/lib/app-settings";
 import { getAppConfig } from "@/lib/app-settings-server";
+import { getTeamPerformance } from "@/lib/performance";
 import { createServiceClient } from "@/lib/supabase/server";
 import { createClient } from "@/lib/supabase/server";
 import { todayInChile } from "@/lib/membership";
@@ -90,6 +91,12 @@ export default async function AdminDashboard({
     .in("status", ["pendiente", "en_progreso"])
     .order("due_date", { nullsFirst: false })
     .limit(5);
+
+  // Resumen de desempeño: solo para socios, y solo si hay con qué medir.
+  const performance = member.role === "socio" ? await getTeamPerformance(90) : null;
+  const perfRows = (performance?.rows ?? [])
+    .filter((r) => r.tasksTotal > 0 || r.evaluationsDue > 0)
+    .sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
 
   // Widgets configurables desde /admin/configuracion, en el orden elegido.
   const catalogue: Record<WidgetId, { label: string; value: number; icon: typeof ListTodo; href: string; alert?: boolean; staffOnly?: boolean; ownerOnly?: boolean }> = {
@@ -233,6 +240,42 @@ export default async function AdminDashboard({
           <p className="card text-sm text-white/45">No hay eventos agendados.</p>
         )}
       </section>
+
+      {perfRows.length > 0 && (
+        <section className="card space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="font-heading text-lg font-bold text-white">Cómo va el equipo</h2>
+              <p className="text-sm text-white/45">Últimos 90 días · tareas cerradas, puntualidad y evaluaciones.</p>
+            </div>
+            <Link href="/admin/desempeno" className="inline-flex items-center gap-1.5 text-sm text-stride-cyan hover:underline">
+              Ver detalle <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+
+          <ul className="space-y-2.5">
+            {perfRows.slice(0, 6).map((row) => (
+              <li key={row.member.id} className="grid grid-cols-[130px_1fr_auto] items-center gap-3" title={`${row.tasksDone}/${row.tasksTotal} tareas cerradas`}>
+                <span className="truncate text-sm text-white/75">{row.member.nickname ?? row.member.full_name}</span>
+                <div className="h-2 overflow-hidden rounded-full bg-white/5">
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${row.score ?? 0}%`,
+                      background: row.score === null ? "#3f3f46" : row.score >= 70 ? "#199e70" : row.score >= 50 ? "#c98500" : "#e66767",
+                    }}
+                  />
+                </div>
+                <span className="w-14 text-right text-sm font-semibold text-white/70">
+                  {row.score ?? "—"}
+                  {row.tasksOverdue > 0 && <span className="ml-1 text-xs text-red-400">·{row.tasksOverdue}</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
     </div>
   );
 }
