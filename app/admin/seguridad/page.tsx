@@ -2,6 +2,7 @@ import { ShieldCheck } from "lucide-react";
 import { requireTeamMember } from "@/lib/auth";
 import { TotpManager } from "@/components/admin/TotpManager";
 import { MyPhotoUploader } from "@/components/admin/MyPhotoUploader";
+import { ChangePasswordForm } from "@/components/admin/ChangePasswordForm";
 import { createServiceClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +37,8 @@ export default async function SecurityPage() {
       <MyPhotoUploader photoUrl={photoUrl} name={member.nickname ?? member.full_name} />
 
       <TotpManager accountEmail={member.email} />
+
+      <ChangePasswordForm />
     </div>
   );
 }
