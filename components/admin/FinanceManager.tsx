@@ -29,11 +29,24 @@ export const AREAS: Array<{ value: string; label: string }> = [
 
 const KIND_LABEL: Record<Transaction["kind"], string> = { ingreso: "Ingreso", costo: "Costo", gasto: "Gasto" };
 
+const OTHER = "__otra__";
+
 function TxFields({ tx, events, today, catalogue }: { tx?: Transaction; events: StrideEvent[]; today: string; catalogue: CategoryNode[] }) {
   const [kind, setKind] = useState<Transaction["kind"]>(tx?.kind ?? "gasto");
-  const [category, setCategory] = useState(tx?.category ?? "");
   const forKind = catalogue.filter((c) => c.kind === kind);
-  const subcats = forKind.find((c) => c.name.toLowerCase() === category.toLowerCase())?.subcategories ?? [];
+
+  // Si la transacción trae una categoría que no está en el catálogo, se ofrece igual.
+  const initialCat = tx?.category ?? "";
+  const catKnown = (v: string) => forKind.some((c) => c.name.toLowerCase() === v.toLowerCase());
+  const [category, setCategory] = useState(initialCat && !catKnown(initialCat) ? OTHER : initialCat);
+  const [customCategory, setCustomCategory] = useState(initialCat && !catKnown(initialCat) ? initialCat : "");
+
+  const effectiveCategory = category === OTHER ? customCategory : category;
+  const subcats = forKind.find((c) => c.name.toLowerCase() === effectiveCategory.toLowerCase())?.subcategories ?? [];
+  const initialSub = tx?.subcategory ?? "";
+  const subKnown = subcats.some((x) => x.toLowerCase() === initialSub.toLowerCase());
+  const [subcategory, setSubcategory] = useState(initialSub && !subKnown ? OTHER : initialSub);
+  const [customSubcategory, setCustomSubcategory] = useState(initialSub && !subKnown ? initialSub : "");
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <div>
@@ -51,21 +64,55 @@ function TxFields({ tx, events, today, catalogue }: { tx?: Transaction; events: 
       </div>
       <div>
         <label className="label" htmlFor="category">Categoría</label>
-        <input id="category" name="category" list={`cat-list-${kind}`} required
-          value={category} onChange={(e) => setCategory(e.target.value)} className="input"
-          placeholder={forKind[0]?.name ?? "Categoría"} />
-        <datalist id={`cat-list-${kind}`}>
-          {forKind.map((c) => <option key={c.name} value={c.name} />)}
-        </datalist>
+        <select
+          id="category"
+          required
+          value={category}
+          onChange={(e) => { setCategory(e.target.value); setSubcategory(""); setCustomSubcategory(""); }}
+          className="input"
+          {...(category === OTHER ? {} : { name: "category" })}
+        >
+          <option value="" className="bg-stride-card">Elige…</option>
+          {forKind.map((c) => <option key={c.name} value={c.name} className="bg-stride-card">{c.name}</option>)}
+          <option value={OTHER} className="bg-stride-card">Otra (escribir)</option>
+        </select>
+        {category === OTHER && (
+          <input
+            name="category"
+            required
+            value={customCategory}
+            onChange={(e) => setCustomCategory(e.target.value)}
+            className="input mt-2"
+            placeholder="Nueva categoría"
+            aria-label="Categoría nueva"
+          />
+        )}
+        <p className="mt-1 text-xs text-white/35">El catálogo se administra en Finanzas → Categorías.</p>
       </div>
       <div>
         <label className="label" htmlFor="subcategory">Subcategoría</label>
-        <input id="subcategory" name="subcategory" list="subcat-list"
-          defaultValue={tx?.subcategory ?? ""} className="input"
-          placeholder={subcats[0] ?? "Opcional"} />
-        <datalist id="subcat-list">
-          {subcats.map((c) => <option key={c} value={c} />)}
-        </datalist>
+        <select
+          id="subcategory"
+          value={subcategory}
+          onChange={(e) => { setSubcategory(e.target.value); if (e.target.value !== OTHER) setCustomSubcategory(""); }}
+          className="input"
+          disabled={subcats.length === 0 && subcategory !== OTHER && !customSubcategory}
+          {...(subcategory === OTHER ? {} : { name: "subcategory" })}
+        >
+          <option value="" className="bg-stride-card">{subcats.length ? "Sin subcategoría" : "Esta categoría no tiene"}</option>
+          {subcats.map((c) => <option key={c} value={c} className="bg-stride-card">{c}</option>)}
+          {subcats.length > 0 && <option value={OTHER} className="bg-stride-card">Otra (escribir)</option>}
+        </select>
+        {subcategory === OTHER && (
+          <input
+            name="subcategory"
+            value={customSubcategory}
+            onChange={(e) => setCustomSubcategory(e.target.value)}
+            className="input mt-2"
+            placeholder="Nueva subcategoría"
+            aria-label="Subcategoría nueva"
+          />
+        )}
       </div>
       <div>
         <label className="label" htmlFor="area">Área</label>
