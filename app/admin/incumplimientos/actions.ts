@@ -122,6 +122,17 @@ export async function resolveIncumplimiento(formData: FormData): Promise<BookRes
     .eq("id", parsed.data.id);
   if (error) return { ok: false, error: "No se pudo calificar." };
 
+  // El Pacto (10.1) exige que el registro viva en el Libro del Drive: se
+  // archiva solo al cerrar. Si Drive falla, el cierre igual queda hecho y
+  // siempre se puede reexportar a mano.
+  try {
+    const form = new FormData();
+    form.set("id", parsed.data.id);
+    await exportIncumplimientoToDrive(form);
+  } catch {
+    /* el registro en la base es la fuente de verdad */
+  }
+
   revalidatePath("/admin/incumplimientos");
   return { ok: true };
 }
@@ -223,4 +234,120 @@ export async function closeImprovementPlan(formData: FormData): Promise<BookResu
 
   revalidatePath("/admin/incumplimientos");
   return { ok: true };
+}
+
+const esc = (v: string | null | undefined) =>
+  (v ?? "—").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+const CLASS_LABEL: Record<string, string> = {
+  sin_calificar: "Sin calificar",
+  subsanado: "Subsanado (antecedente, no acumula)",
+  leve_efectivo: "Incumplimiento Leve efectivo",
+  grave_directo: "Incumplimiento Grave directo",
+};
+
+/**
+ * Guarda el acta en Drive, en la carpeta "Libro de Actas y Gobernanza" que
+ * exige el Pacto (10.1 y 18). Se llama sola al cerrar un registro y también
+ * a mano; cada exportación crea una versión nueva y nunca pisa la anterior.
+ */
+export async function exportIncumplimientoToDrive(formData: FormData): Promise<BookResult & { url?: string }> {
+  await requireTeamMember(["socio"]);
+  const id = z.string().uuid().safeParse(formData.get("id"));
+  if (!id.success) return { ok: false, error: "Registro inválido" };
+
+  const { driveConfigured, ensureRootFolder, uploadAsGoogleDoc } = await import("@/lib/google-drive");
+  if (!driveConfigured()) return { ok: false, error: "Drive no está configurado en este entorno." };
+
+  const supabase = await createClient();
+  const [{ data: row }, { data: team }] = await Promise.all([
+    supabase.from("incumplimientos").select("*").eq("id", id.data).maybeSingle(),
+    supabase.from("team_members").select("id, full_name, nickname, role"),
+  ]);
+  if (!row) return { ok: false, error: "No encontramos el registro." };
+
+  const person = (uid: string | null) => {
+    const p = (team ?? []).find((t) => t.id === uid);
+    return p ? p.full_name : "—";
+  };
+  const fecha = (v: string | null) => (v ? v.slice(0, 10).split("-").reverse().join("/") : "—");
+
+  // Los nueve campos mínimos del Pacto 10.1, en el mismo orden del texto.
+  const html = `
+<h1>STRIDE SpA — Libro de Incumplimientos</h1>
+<p><i>Registro conforme al Capítulo 10 del Pacto de Socios y Gobernanza Societaria.</i></p>
+<table border="1">
+<tr><td><b>a) Involucrado</b></td><td>${esc(person(row.team_member_id))}</td></tr>
+<tr><td><b>b) Output, obligación o conducta afectada</b></td><td>${esc(row.subject)}</td></tr>
+<tr><td><b>c) Fecha del incumplimiento</b></td><td>${fecha(row.occurred_on)}</td></tr>
+<tr><td><b>d) Antecedentes o medios de respaldo</b></td><td>${esc(row.evidence)}</td></tr>
+<tr><td><b>e) Fecha de notificación</b></td><td>${fecha(row.notified_at)}</td></tr>
+<tr><td><b>f) Descargos presentados</b></td><td>${esc(row.member_response)}</td></tr>
+<tr><td><b>g) Plazo y resultado de la subsanación</b></td><td>Plazo hasta ${fecha(row.remediation_due)}. ${esc(row.remediation_result)}</td></tr>
+<tr><td><b>h) Calificación final de la falta</b></td><td>${esc(CLASS_LABEL[row.classification] ?? row.classification)}</td></tr>
+<tr><td><b>i) Medidas adoptadas</b></td><td>${esc(row.measures)}</td></tr>
+</table>
+<p><b>Registrado por:</b> ${esc(person(row.registered_by))} · <b>Estado:</b> ${esc(row.status)}</p>
+<p style="font-size:10pt;color:#666">La sola incorporación de una acusación al Libro no significa que el
+incumplimiento se encuentre acreditado (Pacto, 10.1). Documento generado desde el ERP STRIDE.</p>`;
+
+  try {
+    const folder = await ensureRootFolder("Libro de Actas y Gobernanza");
+    const stamp = new Date()
+      .toLocaleString("es-CL", { timeZone: "America/Santiago", hour12: false })
+      .replace(/[/:]/g, "-")
+      .replace(", ", " ");
+    const doc = await uploadAsGoogleDoc(
+      folder,
+      `Incumplimiento — ${person(row.team_member_id)} — ${fecha(row.occurred_on)} (${stamp})`,
+      html
+    );
+    await supabase.from("incumplimientos").update({ drive_url: doc.webViewLink }).eq("id", row.id);
+    revalidatePath("/admin/incumplimientos");
+    return { ok: true, url: doc.webViewLink };
+  } catch {
+    return { ok: false, error: "Drive rechazó el documento. Intenta de nuevo." };
+  }
+}
+
+/** Guarda un Plan de Mejora en la misma carpeta de gobernanza (Pacto 10.4). */
+export async function exportPlanToDrive(formData: FormData): Promise<BookResult & { url?: string }> {
+  await requireTeamMember(["socio"]);
+  const id = z.string().uuid().safeParse(formData.get("id"));
+  if (!id.success) return { ok: false, error: "Plan inválido" };
+
+  const { driveConfigured, ensureRootFolder, uploadAsGoogleDoc } = await import("@/lib/google-drive");
+  if (!driveConfigured()) return { ok: false, error: "Drive no está configurado en este entorno." };
+
+  const supabase = await createClient();
+  const [{ data: plan }, { data: team }] = await Promise.all([
+    supabase.from("improvement_plans").select("*").eq("id", id.data).maybeSingle(),
+    supabase.from("team_members").select("id, full_name"),
+  ]);
+  if (!plan) return { ok: false, error: "No encontramos el plan." };
+
+  const name = (team ?? []).find((t) => t.id === plan.team_member_id)?.full_name ?? "—";
+  const fecha = (v: string) => v.slice(0, 10).split("-").reverse().join("/");
+  const html = `
+<h1>STRIDE SpA — Plan de Mejora</h1>
+<p><i>Conforme al numeral 10.4 del Pacto de Socios. Duración: 30 días corridos.</i></p>
+<table border="1">
+<tr><td><b>Involucrado</b></td><td>${esc(name)}</td></tr>
+<tr><td><b>Periodo</b></td><td>${fecha(plan.started_on)} al ${fecha(plan.due_on)}</td></tr>
+<tr><td><b>a) Conductas o deficiencias a corregir</b></td><td>${esc(plan.deficiencies)}</td></tr>
+<tr><td><b>b) y c) Outputs comprometidos y fechas</b></td><td>${esc(plan.outputs)}</td></tr>
+<tr><td><b>d) Criterios objetivos de aceptación</b></td><td>${esc(plan.acceptance_criteria)}</td></tr>
+<tr><td><b>e) Apoyo, redistribución o seguimiento</b></td><td>${esc(plan.support)}</td></tr>
+<tr><td><b>Resultado</b></td><td>${esc(plan.result)}. ${esc(plan.closing_notes)}</td></tr>
+</table>
+<p style="font-size:10pt;color:#666">Documento generado desde el ERP STRIDE.</p>`;
+
+  try {
+    const folder = await ensureRootFolder("Libro de Actas y Gobernanza");
+    const doc = await uploadAsGoogleDoc(folder, `Plan de Mejora — ${name} — ${fecha(plan.started_on)}`, html);
+    revalidatePath("/admin/incumplimientos");
+    return { ok: true, url: doc.webViewLink };
+  } catch {
+    return { ok: false, error: "Drive rechazó el documento." };
+  }
 }

@@ -2,11 +2,11 @@
 
 import { useState, useTransition, type FormEvent } from "react";
 import {
-  AlertOctagon, Ban, BookLock, Check, ClipboardCheck, Loader2, MessageSquare, Plus, Send, ShieldAlert, X,
+  AlertOctagon, Ban, BookLock, Check, ClipboardCheck, ExternalLink, FileOutput, Loader2, MessageSquare, Plus, Send, ShieldAlert,
 } from "lucide-react";
 import {
-  annulIncumplimiento, closeImprovementPlan, createImprovementPlan, notifyIncumplimiento,
-  registerIncumplimiento, resolveIncumplimiento, submitDescargos,
+  annulIncumplimiento, closeImprovementPlan, createImprovementPlan, exportIncumplimientoToDrive,
+  exportPlanToDrive, notifyIncumplimiento, registerIncumplimiento, resolveIncumplimiento, submitDescargos,
 } from "@/app/admin/incumplimientos/actions";
 import type { TeamMember } from "@/lib/types";
 
@@ -23,6 +23,7 @@ export interface IncumplimientoRow {
   classification: "sin_calificar" | "subsanado" | "leve_efectivo" | "grave_directo";
   measures: string | null;
   status: "registrado" | "notificado" | "con_descargos" | "cerrado" | "anulado";
+  drive_url: string | null;
 }
 
 export interface PlanRow {
@@ -145,6 +146,9 @@ export function IncumplimientosBook({
                   <option value="incumplido" className="bg-stride-card">Incumplido</option>
                 </select>
                 <button type="submit" disabled={pending} className="btn-secondary px-3 py-1.5 text-xs">Cerrar</button>
+                <button type="button" onClick={() => simple(exportPlanToDrive, plan.id)} disabled={pending} className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/60 hover:text-white">
+                  <FileOutput className="h-3.5 w-3.5" /> Drive
+                </button>
               </form>
             )}
           </div>
@@ -317,6 +321,14 @@ export function IncumplimientosBook({
                         <ClipboardCheck className="h-3.5 w-3.5" /> Calificar y cerrar
                       </button>
                     )}
+                    <button type="button" onClick={() => simple(exportIncumplimientoToDrive, row.id)} disabled={pending} className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/60 hover:text-white">
+                      <FileOutput className="h-3.5 w-3.5" /> {row.drive_url ? "Reexportar" : "Guardar en Drive"}
+                    </button>
+                    {row.drive_url && (
+                      <a href={row.drive_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-stride-cyan/30 px-3 py-1.5 text-xs text-stride-cyan hover:bg-stride-cyan/10">
+                        <ExternalLink className="h-3.5 w-3.5" /> Ver acta
+                      </a>
+                    )}
                     <button type="button" onClick={() => { if (window.confirm("¿Anular este registro?")) simple(annulIncumplimiento, row.id); }} disabled={pending} className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/30 hover:border-red-400/40 hover:text-red-300">
                       <Ban className="h-3.5 w-3.5" /> Anular
                     </button>
@@ -339,6 +351,7 @@ export function IncumplimientosBook({
                         <option value="leve_efectivo" className="bg-stride-card">Leve efectivo (acumula para los 6 meses)</option>
                         <option value="grave_directo" className="bg-stride-card">Grave directo</option>
                       </select>
+                      <p className="mt-1 text-xs text-white/35">Al cerrar, el acta se guarda sola en Drive → Libro de Actas y Gobernanza.</p>
                     </div>
                     <div>
                       <label htmlFor={`rem-${row.id}`} className="label">Resultado de la subsanación</label>
