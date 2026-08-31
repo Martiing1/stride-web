@@ -14,7 +14,7 @@ const BudgetSchema = z.object({
   year: z.coerce.number().int().min(2024).max(2100),
   month: z.coerce.number().int().min(1).max(12),
   category: z.string().trim().min(2).max(60),
-  kind: z.enum(["ingreso", "gasto"]),
+  kind: z.enum(["ingreso", "costo", "gasto"]),
   planned_clp: z.coerce.number().int().min(0).max(500_000_000),
   // 1 = solo ese mes; 3 = trimestre (el mes elegido y los dos siguientes).
   span: z.enum(["1", "3"]).default("1"),

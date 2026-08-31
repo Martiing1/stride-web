@@ -11,7 +11,9 @@ export interface FinanceResult {
 }
 
 const TxSchema = z.object({
-  kind: z.enum(["ingreso", "gasto"]),
+  kind: z.enum(["ingreso", "costo", "gasto"]),
+  subcategory: z.string().trim().max(60).or(z.literal("")),
+  area: z.enum(["general", "membresia", "social_run", "marketing", "alianzas", "operacion"]).default("general"),
   amount_clp: z.string().min(1, "Falta el monto"),
   category: z.string().trim().min(2, "Falta la categoría").max(60),
   description: z.string().trim().max(300),
@@ -27,6 +29,8 @@ function toRow(d: z.infer<typeof TxSchema>) {
     // Se guarda en pesos enteros: el CLP no tiene decimales.
     amount_clp: Math.round(Number(d.amount_clp)),
     category: d.category,
+    subcategory: d.subcategory || null,
+    area: d.area,
     description: d.description || null,
     occurred_on: d.occurred_on,
     event_id: d.event_id || null,
@@ -40,6 +44,8 @@ function parse(formData: FormData) {
     kind: formData.get("kind") ?? "gasto",
     amount_clp: formData.get("amount_clp") ?? "",
     category: formData.get("category") ?? "",
+    subcategory: formData.get("subcategory") ?? "",
+    area: formData.get("area") ?? "general",
     description: formData.get("description") ?? "",
     occurred_on: formData.get("occurred_on") ?? "",
     event_id: formData.get("event_id") ?? "",

@@ -43,8 +43,8 @@ export default async function PresupuestosPage({
     supabase.from("transactions").select("kind, amount_clp").gte("occurred_on", qStart).lte("occurred_on", qEnd),
   ]);
 
-  const qPlannedGasto = (qBudgets ?? []).filter((b) => b.kind === "gasto").reduce((s, b) => s + b.planned_clp, 0);
-  const qRealGasto = (qTx ?? []).filter((t) => t.kind === "gasto").reduce((s, t) => s + t.amount_clp, 0);
+  const qPlannedGasto = (qBudgets ?? []).filter((b) => b.kind !== "ingreso").reduce((s, b) => s + b.planned_clp, 0);
+  const qRealGasto = (qTx ?? []).filter((t) => t.kind !== "ingreso").reduce((s, t) => s + t.amount_clp, 0);
   const qPlannedIngreso = (qBudgets ?? []).filter((b) => b.kind === "ingreso").reduce((s, b) => s + b.planned_clp, 0);
   const qRealIngreso = (qTx ?? []).filter((t) => t.kind === "ingreso").reduce((s, t) => s + t.amount_clp, 0);
   const quarterLabel = `Q${Math.floor((month - 1) / 3) + 1} ${year}`;
@@ -87,7 +87,7 @@ export default async function PresupuestosPage({
           <h2 className="mb-3 font-heading text-lg font-bold text-white">Trimestre {quarterLabel}</h2>
           <dl className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-xl bg-white/[0.03] p-4">
-              <dt className="text-xs uppercase tracking-wide text-white/35">Gastos</dt>
+              <dt className="text-xs uppercase tracking-wide text-white/35">Costos + gastos</dt>
               <dd className={`mt-1 font-heading text-xl font-extrabold ${qRealGasto > qPlannedGasto ? "text-red-400" : "text-white"}`}>
                 {formatCLP(qRealGasto)} <span className="text-sm font-normal text-white/40">de {formatCLP(qPlannedGasto)} presupuestados</span>
               </dd>

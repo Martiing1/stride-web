@@ -18,10 +18,10 @@ export const metadata = { title: "Libro diario" };
 export default async function LibroDiarioPage({
   searchParams,
 }: {
-  searchParams: Promise<{ mes?: string; tipo?: string; categoria?: string }>;
+  searchParams: Promise<{ mes?: string; tipo?: string; categoria?: string; area?: string }>;
 }) {
   await requireTeamMember(["socio"]);
-  const { mes, tipo, categoria } = await searchParams;
+  const { mes, tipo, categoria, area } = await searchParams;
   const supabase = await createClient();
 
   let query = supabase.from("transactions").select("*").order("occurred_on").order("created_at");
@@ -30,7 +30,8 @@ export default async function LibroDiarioPage({
     const end = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
     query = query.gte("occurred_on", `${mes}-01`).lte("occurred_on", end);
   }
-  if (tipo === "ingreso" || tipo === "gasto") query = query.eq("kind", tipo);
+  if (tipo === "ingreso" || tipo === "costo" || tipo === "gasto") query = query.eq("kind", tipo);
+  if (area && area !== "todas") query = query.eq("area", area);
   if (categoria) query = query.eq("category", categoria);
 
   const [{ data: txData }, { data: allCats }] = await Promise.all([
@@ -46,6 +47,7 @@ export default async function LibroDiarioPage({
     return { ...t, balance: running };
   });
   const ingresos = transactions.filter((t) => t.kind === "ingreso").reduce((s, t) => s + t.amount_clp, 0);
+  const costos = transactions.filter((t) => t.kind === "costo").reduce((s, t) => s + t.amount_clp, 0);
   const gastos = transactions.filter((t) => t.kind === "gasto").reduce((s, t) => s + t.amount_clp, 0);
 
   return (
@@ -58,7 +60,7 @@ export default async function LibroDiarioPage({
           <BookOpen className="h-7 w-7 text-stride-cyan" /> Libro diario
         </h1>
         <p className="mt-1 text-white/50">
-          {rows.length} movimientos{mes ? ` en ${mes}` : ""} · {formatCLP(ingresos)} ingresos · {formatCLP(gastos)} gastos
+          {rows.length} movimientos{mes ? ` en ${mes}` : ""} · {formatCLP(ingresos)} ingresos · {formatCLP(costos)} costos · {formatCLP(gastos)} gastos
         </p>
       </header>
 
@@ -73,6 +75,7 @@ export default async function LibroDiarioPage({
           <select id="tipo" name="tipo" defaultValue={tipo ?? ""} className="input w-auto py-2 text-sm">
             <option value="" className="bg-stride-card">Todos</option>
             <option value="ingreso" className="bg-stride-card">Ingresos</option>
+            <option value="costo" className="bg-stride-card">Costos</option>
             <option value="gasto" className="bg-stride-card">Gastos</option>
           </select>
         </div>
@@ -81,6 +84,18 @@ export default async function LibroDiarioPage({
           <select id="categoria" name="categoria" defaultValue={categoria ?? ""} className="input w-auto py-2 text-sm">
             <option value="" className="bg-stride-card">Todas</option>
             {categories.map((c) => <option key={c} value={c} className="bg-stride-card">{c}</option>)}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="area" className="label">Área</label>
+          <select id="area" name="area" defaultValue={area ?? ""} className="input w-auto py-2 text-sm">
+            <option value="" className="bg-stride-card">Todas</option>
+            <option value="membresia" className="bg-stride-card">Membresía</option>
+            <option value="social_run" className="bg-stride-card">Social Run</option>
+            <option value="marketing" className="bg-stride-card">Marketing</option>
+            <option value="alianzas" className="bg-stride-card">Alianzas</option>
+            <option value="operacion" className="bg-stride-card">Operación</option>
+            <option value="general" className="bg-stride-card">General</option>
           </select>
         </div>
         <button type="submit" className="btn-secondary px-5 py-2 text-sm">Filtrar</button>
@@ -100,6 +115,7 @@ export default async function LibroDiarioPage({
                 <th className="p-3 font-medium">Detalle</th>
                 <th className="p-3 font-medium">Categoría</th>
                 <th className="p-3 text-right font-medium">Ingreso</th>
+                <th className="p-3 text-right font-medium">Costo</th>
                 <th className="p-3 text-right font-medium">Gasto</th>
                 <th className="p-3 text-right font-medium">Saldo</th>
               </tr>
@@ -109,8 +125,9 @@ export default async function LibroDiarioPage({
                 <tr key={t.id} className="border-b border-white/5 last:border-0">
                   <td className="whitespace-nowrap p-3 text-white/55">{formatDateCL(t.occurred_on)}</td>
                   <td className="p-3 text-white">{t.description ?? "—"}</td>
-                  <td className="p-3"><span className="rounded-full bg-white/5 px-2 py-0.5 text-xs capitalize text-white/60">{t.category}</span></td>
+                  <td className="p-3"><span className="rounded-full bg-white/5 px-2 py-0.5 text-xs capitalize text-white/60">{t.category}{t.subcategory ? ` / ${t.subcategory}` : ""}</span></td>
                   <td className="whitespace-nowrap p-3 text-right text-emerald-400">{t.kind === "ingreso" ? formatCLP(t.amount_clp) : ""}</td>
+                  <td className="whitespace-nowrap p-3 text-right text-amber-400">{t.kind === "costo" ? formatCLP(t.amount_clp) : ""}</td>
                   <td className="whitespace-nowrap p-3 text-right text-red-400">{t.kind === "gasto" ? formatCLP(t.amount_clp) : ""}</td>
                   <td className={`whitespace-nowrap p-3 text-right font-semibold ${t.balance >= 0 ? "text-white" : "text-red-300"}`}>{formatCLP(t.balance)}</td>
                 </tr>

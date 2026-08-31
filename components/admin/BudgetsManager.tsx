@@ -10,7 +10,7 @@ export interface BudgetRow {
   year: number;
   month: number;
   category: string;
-  kind: "ingreso" | "gasto";
+  kind: "ingreso" | "costo" | "gasto";
   planned_clp: number;
   actual_clp: number;
 }
@@ -46,6 +46,7 @@ export function BudgetsManager({ rows, year, month }: { rows: BudgetRow[]; year:
   }
 
   const gastos = rows.filter((r) => r.kind === "gasto");
+  const costos = rows.filter((r) => r.kind === "costo");
   const ingresos = rows.filter((r) => r.kind === "ingreso");
 
   return (
@@ -60,6 +61,7 @@ export function BudgetsManager({ rows, year, month }: { rows: BudgetRow[]; year:
             <label htmlFor="kind" className="label">Tipo</label>
             <select id="kind" name="kind" defaultValue="gasto" className="input w-auto">
               <option value="gasto" className="bg-stride-card">Gasto</option>
+              <option value="costo" className="bg-stride-card">Costo</option>
               <option value="ingreso" className="bg-stride-card">Ingreso</option>
             </select>
           </div>
@@ -89,14 +91,14 @@ export function BudgetsManager({ rows, year, month }: { rows: BudgetRow[]; year:
 
       {error && <p className="rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-200">{error}</p>}
 
-      {[{ label: "Gastos", list: gastos, over: "gastado" }, { label: "Ingresos", list: ingresos, over: "logrado" }].map(({ label, list, over }) =>
+      {[{ label: "Costos", list: costos, over: "gastado" }, { label: "Gastos", list: gastos, over: "gastado" }, { label: "Ingresos", list: ingresos, over: "logrado" }].map(({ label, list, over }) =>
         list.length === 0 ? null : (
           <section key={label} className="card space-y-4">
             <h2 className="font-heading text-lg font-bold text-white">{label}</h2>
             <ul className="space-y-3">
               {list.map((row) => {
                 const pct = row.planned_clp ? Math.min(1.5, row.actual_clp / row.planned_clp) : 0;
-                const overBudget = row.kind === "gasto" && row.actual_clp > row.planned_clp;
+                const overBudget = row.kind !== "ingreso" && row.actual_clp > row.planned_clp;
                 return (
                   <li key={row.id}>
                     <div className="mb-1 flex items-center justify-between gap-3 text-sm">

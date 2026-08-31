@@ -286,6 +286,7 @@ export interface MonthChecklistItem {
 export interface MonthlyFinanceSummary {
   month: string;
   ingresos: number | null;
+  costos: number | null;
   gastos: number | null;
   resultado: number;
   movimientos: number;
@@ -293,9 +294,13 @@ export interface MonthlyFinanceSummary {
 
 export interface Transaction {
   id: string;
-  kind: "ingreso" | "gasto";
+  kind: "ingreso" | "costo" | "gasto";
   amount_clp: number;
   category: string;
+  /** Subcategoría del catálogo (migración 007). */
+  subcategory?: string | null;
+  /** Área del negocio a la que se anexa el movimiento. */
+  area?: string;
   description: string | null;
   event_id: string | null;
   member_id: string | null;

@@ -1,11 +1,11 @@
 import { TrendingUp, TrendingDown, Wallet, LineChart } from "lucide-react";
 import Link from "next/link";
-import { BookOpen, Target, UserMinus } from "lucide-react";
+import { BookOpen, Target, UserMinus, Tags } from "lucide-react";
 import { requireTeamMember } from "@/lib/auth";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { formatCLP, SITE } from "@/lib/site";
 import { todayInChile } from "@/lib/membership";
-import { FinanceManager } from "@/components/admin/FinanceManager";
+import { FinanceManager, type CategoryNode } from "@/components/admin/FinanceManager";
 import type { Transaction, StrideEvent, MonthlyFinanceSummary } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -37,6 +37,24 @@ export default async function FinanzasPage() {
       supabase.from("monthly_finance_summary").select("*").limit(12),
     ]);
 
+  // Catálogo de categorías (migración 007): si aún no corre, el formulario
+  // funciona igual con texto libre.
+  const { data: catData } = await supabase
+    .from("finance_categories")
+    .select("id, kind, name, parent_id")
+    .eq("active", true)
+    .order("sort_order")
+    .order("name");
+  const catalogue: CategoryNode[] = [];
+  for (const cat of catData ?? []) {
+    if (cat.parent_id) continue;
+    catalogue.push({
+      name: cat.name,
+      kind: cat.kind,
+      subcategories: (catData ?? []).filter((c) => c.parent_id === cat.id).map((c) => c.name),
+    });
+  }
+
   const transactions = (txData ?? []) as Transaction[];
   const summary = (summaryData ?? []) as MonthlyFinanceSummary[];
 
@@ -52,15 +70,16 @@ export default async function FinanzasPage() {
 
   const thisMonth = transactions.filter((t) => t.occurred_on >= monthStart);
   const ingresos = thisMonth.filter((t) => t.kind === "ingreso").reduce((s, t) => s + t.amount_clp, 0);
+  const costos = thisMonth.filter((t) => t.kind === "costo").reduce((s, t) => s + t.amount_clp, 0);
   const gastos = thisMonth.filter((t) => t.kind === "gasto").reduce((s, t) => s + t.amount_clp, 0);
-  const resultado = ingresos - gastos;
+  const resultado = ingresos - costos - gastos;
 
   // Proyección: lo que entra si todos los miembros activos siguen pagando.
   const mrr = (activeMembers ?? 0) * SITE.membership.priceCLP;
 
   const maxAbs = Math.max(
     1,
-    ...summary.map((s) => Math.max(s.ingresos ?? 0, s.gastos ?? 0))
+    ...summary.map((s) => Math.max(s.ingresos ?? 0, s.costos ?? 0, s.gastos ?? 0))
   );
 
   return (
@@ -77,11 +96,15 @@ export default async function FinanzasPage() {
         <Link href="/admin/finanzas/presupuestos" className="inline-flex items-center gap-2 rounded-full border border-white/15 px-5 py-2.5 text-sm font-semibold text-white/80 transition hover:border-white/30 hover:text-white">
           <Target className="h-4 w-4" /> Presupuestos
         </Link>
+        <Link href="/admin/finanzas/categorias" className="inline-flex items-center gap-2 rounded-full border border-white/15 px-5 py-2.5 text-sm font-semibold text-white/80 transition hover:border-white/30 hover:text-white">
+          <Tags className="h-4 w-4" /> Categorías
+        </Link>
       </nav>
 
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
         {[
           { label: "Ingresos del mes", value: formatCLP(ingresos), icon: TrendingUp, tone: "text-emerald-400" },
+          { label: "Costos del mes", value: formatCLP(costos), icon: TrendingDown, tone: "text-amber-400" },
           { label: "Gastos del mes", value: formatCLP(gastos), icon: TrendingDown, tone: "text-red-400" },
           {
             label: "Resultado",
@@ -120,6 +143,7 @@ export default async function FinanzasPage() {
           <ul className="space-y-3">
             {summary.map((s) => {
               const ing = s.ingresos ?? 0;
+              const cos = s.costos ?? 0;
               const gas = s.gastos ?? 0;
               return (
                 <li key={s.month}>
@@ -135,13 +159,19 @@ export default async function FinanzasPage() {
                       <div className="h-full rounded-full bg-emerald-500"
                         style={{ width: `${(ing / maxAbs) * 100}%` }} />
                     </div>
+                    {cos > 0 && (
+                      <div className="h-1.5 overflow-hidden rounded-full bg-white/5">
+                        <div className="h-full rounded-full bg-amber-500"
+                          style={{ width: `${(cos / maxAbs) * 100}%` }} />
+                      </div>
+                    )}
                     <div className="h-1.5 overflow-hidden rounded-full bg-white/5">
                       <div className="h-full rounded-full bg-red-500"
                         style={{ width: `${(gas / maxAbs) * 100}%` }} />
                     </div>
                   </div>
                   <p className="mt-1 text-[11px] text-white/35">
-                    {formatCLP(ing)} ingresos · {formatCLP(gas)} gastos · {s.movimientos} movimientos
+                    {formatCLP(ing)} ingresos{cos > 0 ? ` · ${formatCLP(cos)} costos` : ""} · {formatCLP(gas)} gastos · {s.movimientos} movimientos
                   </p>
                 </li>
               );
@@ -150,7 +180,7 @@ export default async function FinanzasPage() {
         </section>
       )}
 
-      <FinanceManager
+      <FinanceManager catalogue={catalogue}
         transactions={transactions}
         events={(eventsData ?? []) as StrideEvent[]}
         today={today}

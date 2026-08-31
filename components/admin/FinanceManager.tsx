@@ -12,19 +12,36 @@ import {
 import { formatCLP } from "@/lib/site";
 import type { Transaction, StrideEvent } from "@/lib/types";
 
-const CATEGORIES = [
-  "membresia", "sponsor", "evento", "kits", "premios",
-  "produccion", "publicidad", "administracion", "otro",
+export interface CategoryNode {
+  name: string;
+  kind: "ingreso" | "costo" | "gasto";
+  subcategories: string[];
+}
+
+export const AREAS: Array<{ value: string; label: string }> = [
+  { value: "general", label: "General" },
+  { value: "membresia", label: "Membresía" },
+  { value: "social_run", label: "Social Run" },
+  { value: "marketing", label: "Marketing" },
+  { value: "alianzas", label: "Alianzas" },
+  { value: "operacion", label: "Operación" },
 ];
 
-function TxFields({ tx, events, today }: { tx?: Transaction; events: StrideEvent[]; today: string }) {
+const KIND_LABEL: Record<Transaction["kind"], string> = { ingreso: "Ingreso", costo: "Costo", gasto: "Gasto" };
+
+function TxFields({ tx, events, today, catalogue }: { tx?: Transaction; events: StrideEvent[]; today: string; catalogue: CategoryNode[] }) {
+  const [kind, setKind] = useState<Transaction["kind"]>(tx?.kind ?? "gasto");
+  const [category, setCategory] = useState(tx?.category ?? "");
+  const forKind = catalogue.filter((c) => c.kind === kind);
+  const subcats = forKind.find((c) => c.name.toLowerCase() === category.toLowerCase())?.subcategories ?? [];
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <div>
         <label className="label" htmlFor="kind">Tipo</label>
-        <select id="kind" name="kind" defaultValue={tx?.kind ?? "gasto"} className="input">
+        <select id="kind" name="kind" value={kind} onChange={(e) => { setKind(e.target.value as Transaction["kind"]); setCategory(""); }} className="input">
           <option value="ingreso" className="bg-stride-card">Ingreso</option>
-          <option value="gasto" className="bg-stride-card">Gasto</option>
+          <option value="costo" className="bg-stride-card">Costo (producir el servicio)</option>
+          <option value="gasto" className="bg-stride-card">Gasto (operar)</option>
         </select>
       </div>
       <div>
@@ -34,11 +51,27 @@ function TxFields({ tx, events, today }: { tx?: Transaction; events: StrideEvent
       </div>
       <div>
         <label className="label" htmlFor="category">Categoría</label>
-        <input id="category" name="category" list="cat-list" required
-          defaultValue={tx?.category ?? ""} className="input" />
-        <datalist id="cat-list">
-          {CATEGORIES.map((c) => <option key={c} value={c} />)}
+        <input id="category" name="category" list={`cat-list-${kind}`} required
+          value={category} onChange={(e) => setCategory(e.target.value)} className="input"
+          placeholder={forKind[0]?.name ?? "Categoría"} />
+        <datalist id={`cat-list-${kind}`}>
+          {forKind.map((c) => <option key={c.name} value={c.name} />)}
         </datalist>
+      </div>
+      <div>
+        <label className="label" htmlFor="subcategory">Subcategoría</label>
+        <input id="subcategory" name="subcategory" list="subcat-list"
+          defaultValue={tx?.subcategory ?? ""} className="input"
+          placeholder={subcats[0] ?? "Opcional"} />
+        <datalist id="subcat-list">
+          {subcats.map((c) => <option key={c} value={c} />)}
+        </datalist>
+      </div>
+      <div>
+        <label className="label" htmlFor="area">Área</label>
+        <select id="area" name="area" defaultValue={tx?.area ?? "general"} className="input">
+          {AREAS.map((a) => <option key={a.value} value={a.value} className="bg-stride-card">{a.label}</option>)}
+        </select>
       </div>
       <div>
         <label className="label" htmlFor="occurred_on">Fecha</label>
@@ -73,10 +106,12 @@ export function FinanceManager({
   transactions,
   events,
   today,
+  catalogue,
 }: {
   transactions: Transaction[];
   events: StrideEvent[];
   today: string;
+  catalogue: CategoryNode[];
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -88,14 +123,14 @@ export function FinanceManager({
   const [receiptUrl, setReceiptUrl] = useState("");
 
   const byCategory = useMemo(() => {
-    const map = new Map<string, { ingreso: number; gasto: number }>();
+    const map = new Map<string, { ingreso: number; costo: number; gasto: number }>();
     for (const t of transactions) {
-      const cur = map.get(t.category) ?? { ingreso: 0, gasto: 0 };
+      const cur = map.get(t.category) ?? { ingreso: 0, costo: 0, gasto: 0 };
       cur[t.kind] += t.amount_clp;
       map.set(t.category, cur);
     }
     return [...map.entries()].sort(
-      (a, b) => b[1].ingreso + b[1].gasto - (a[1].ingreso + a[1].gasto)
+      (a, b) => b[1].ingreso + b[1].costo + b[1].gasto - (a[1].ingreso + a[1].costo + a[1].gasto)
     );
   }, [transactions]);
 
@@ -193,7 +228,7 @@ export function FinanceManager({
             </button>
           </div>
 
-          <TxFields events={events} today={today} />
+          <TxFields events={events} today={today} catalogue={catalogue} />
 
           <div>
             <p className="label">Comprobante</p>
@@ -260,7 +295,7 @@ export function FinanceManager({
               editing === tx.id ? (
                 <li key={tx.id}>
                   <form onSubmit={(e) => submit(e, tx.id)} className="card space-y-4">
-                    <TxFields tx={tx} events={events} today={today} />
+                    <TxFields tx={tx} events={events} today={today} catalogue={catalogue} />
                     <input type="hidden" name="receipt_url" defaultValue={tx.receipt_url ?? ""} />
                     <div className="flex gap-2">
                       <button type="submit" disabled={busy} className="btn-primary px-5 py-2 text-sm">Guardar</button>
@@ -273,12 +308,14 @@ export function FinanceManager({
                   <div className="min-w-[160px] flex-1">
                     <p className="text-sm text-white">{tx.description || tx.category}</p>
                     <p className="mt-0.5 text-xs text-white/40">
-                      {tx.occurred_on.split("-").reverse().join("/")} · {tx.category}
+                      {tx.occurred_on.split("-").reverse().join("/")} · {KIND_LABEL[tx.kind]} · {tx.category}
+                      {tx.subcategory && ` / ${tx.subcategory}`}
+                      {tx.area && tx.area !== "general" && ` · ${AREAS.find((a) => a.value === tx.area)?.label ?? tx.area}`}
                       {tx.payment_method && ` · ${tx.payment_method}`}
                     </p>
                   </div>
 
-                  <span className={`shrink-0 font-heading font-bold ${tx.kind === "ingreso" ? "text-emerald-400" : "text-red-400"}`}>
+                  <span className={`shrink-0 font-heading font-bold ${tx.kind === "ingreso" ? "text-emerald-400" : tx.kind === "costo" ? "text-amber-400" : "text-red-400"}`}>
                     {tx.kind === "ingreso" ? "+" : "−"}{formatCLP(tx.amount_clp)}
                   </span>
 
