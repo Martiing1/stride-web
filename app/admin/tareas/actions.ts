@@ -283,3 +283,22 @@ export async function getTaskHistory(formData: FormData): Promise<{ ok: boolean;
     })),
   };
 }
+
+/**
+ * Eliminar una tarea de verdad: solo socios. Para el resto existe "hecha" y
+ * el archivo. El historial de la tarea cae en cascada junto con ella.
+ */
+export async function deleteTask(formData: FormData) {
+  await requireTeamMember(["socio"]);
+
+  const id = z.string().uuid().safeParse(formData.get("id"));
+  if (!id.success) return { ok: false, error: "Tarea inválida" };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("tasks").delete().eq("id", id.data);
+  if (error) return { ok: false, error: "No se pudo eliminar la tarea." };
+
+  revalidatePath("/admin/tareas");
+  revalidatePath("/admin");
+  return { ok: true };
+}

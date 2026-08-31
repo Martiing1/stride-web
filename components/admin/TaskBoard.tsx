@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState, useTransition, type DragEvent, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Plus, Loader2, X, ListTodo, Check, Columns3, Rows3, CalendarDays, UserRound, Tag, FileText, Lock, History } from "lucide-react";
-import { updateTaskStatus, createTask, updateTaskNotes, updateTask, getTaskHistory, type TaskHistoryEntry } from "@/app/admin/tareas/actions";
+import { Plus, Loader2, X, ListTodo, Check, Columns3, Rows3, CalendarDays, UserRound, Tag, FileText, Lock, History, Trash2 } from "lucide-react";
+import { updateTaskStatus, createTask, updateTaskNotes, updateTask, getTaskHistory, deleteTask, type TaskHistoryEntry } from "@/app/admin/tareas/actions";
 import type { Task, TeamMember, TaskStatus } from "@/lib/types";
 
 const STATUS_ORDER: TaskStatus[] = ["pendiente", "en_progreso", "bloqueada", "recurrente", "hecha"];
@@ -137,6 +137,19 @@ export function TaskBoard({
     const form = new FormData();
     form.set("id", task.id);
     void getTaskHistory(form).then((res) => setHistory(res.entries));
+  }
+
+  function removeTask() {
+    if (!openTask) return;
+    if (!window.confirm(`¿Eliminar «${openTask.title.slice(0, 60)}»? Se borra con su historial y no se puede deshacer.`)) return;
+    const form = new FormData();
+    form.set("id", openTask.id);
+    startTransition(async () => {
+      const res = await deleteTask(form);
+      if (!res.ok) { setError(res.error ?? "No se pudo eliminar."); return; }
+      setOpenTask(null);
+      router.refresh();
+    });
   }
 
   function saveEdit() {
@@ -501,6 +514,16 @@ export function TaskBoard({
                   <option key={st} value={st} className="bg-stride-card">{statusLabels[st] ?? st}</option>
                 ))}
               </select>
+              {isSocio && (
+                <button
+                  type="button"
+                  onClick={removeTask}
+                  disabled={pending}
+                  className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-white/10 px-4 py-2 text-xs font-semibold text-white/40 transition hover:border-red-400/40 hover:text-red-300"
+                >
+                  <Trash2 className="h-3.5 w-3.5" /> Eliminar
+                </button>
+              )}
             </div>
 
             {/* Historial de cambios */}
