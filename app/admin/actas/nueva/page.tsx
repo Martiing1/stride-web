@@ -6,7 +6,7 @@ import { ActaUploader } from "@/components/admin/ActaUploader";
 export const dynamic = "force-dynamic";
 
 export default async function NuevaActaPage() {
-  await requireTeamMember(["socio", "lider_comunidad"]);
+  const member = await requireTeamMember(["socio", "lider_comunidad"]);
 
   return (
     <div className="space-y-8">
@@ -25,7 +25,7 @@ export default async function NuevaActaPage() {
         </p>
       </header>
 
-      <ActaUploader />
+      <ActaUploader isSocio={member.role === "socio"} />
     </div>
   );
 }

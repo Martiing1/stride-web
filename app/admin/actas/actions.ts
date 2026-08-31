@@ -14,6 +14,7 @@ const TaskOverrideSchema = z.array(
     dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
     priority: z.enum(["alta", "media", "baja"]),
     area: z.string().trim().max(80),
+    visibility: z.enum(["equipo", "socios"]).default("equipo"),
   })
 ).max(50);
 
@@ -59,10 +60,15 @@ export async function saveActa(formData: FormData): Promise<SaveActaResult> {
   // Las tareas pueden venir corregidas desde la previsualización (fechas
   // "A definir", responsables, prioridades). Si llegan, mandan ellas.
   const overrideRaw = formData.get("tasks_override");
+  // Visibilidad por tarea del acta: solo un socio puede marcar "solo socios".
+  const taskVisibility = new Map<number, "equipo" | "socios">();
   if (typeof overrideRaw === "string" && overrideRaw) {
     try {
       const override = TaskOverrideSchema.safeParse(JSON.parse(overrideRaw));
       if (override.success) {
+        override.data.forEach((t, i) => {
+          taskVisibility.set(i, member.role === "socio" ? t.visibility : "equipo");
+        });
         acta.tasks = override.data.map((t) => ({
           actaCode: acta.actaCode ?? "",
           assigneeLabel: t.assigneeLabel || "Sin asignar",
@@ -117,7 +123,7 @@ export async function saveActa(formData: FormData): Promise<SaveActaResult> {
   let tasksCreated = 0;
 
   if (acta.tasks.length > 0) {
-    const rows = acta.tasks.map((task) => {
+    const rows = acta.tasks.map((task, index) => {
       const assigneeId = resolveAssignee(task.assigneeLabel, team);
       if (!assigneeId) {
         warnings.push(
@@ -133,6 +139,7 @@ export async function saveActa(formData: FormData): Promise<SaveActaResult> {
         status: "pendiente" as const,
         due_date: task.dueDate,
         meeting_id: meeting.id,
+        visibility: taskVisibility.get(index) ?? "equipo",
       };
     });
 

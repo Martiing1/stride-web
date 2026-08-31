@@ -58,6 +58,7 @@ export function TaskBoard({
   // Filtros locales: los datos ya están cargados, no hace falta otro viaje.
   const [priorityFilter, setPriorityFilter] = useState("todas");
   const [areaFilter, setAreaFilter] = useState("todas");
+  const [onlySocios, setOnlySocios] = useState(false);
 
   // La vista elegida se recuerda por navegador.
   useEffect(() => {
@@ -116,7 +117,8 @@ export function TaskBoard({
   const visible = tasks.filter(
     (t) =>
       (priorityFilter === "todas" || t.priority === priorityFilter) &&
-      (areaFilter === "todas" || t.area === areaFilter)
+      (areaFilter === "todas" || t.area === areaFilter) &&
+      (!onlySocios || t.visibility === "socios")
   );
 
   function openDetail(task: Task) {
@@ -210,6 +212,17 @@ export function TaskBoard({
               <option key={a} value={a} className="bg-stride-card">{a}</option>
             ))}
           </select>
+        )}
+
+        {isSocio && (
+          <button
+            type="button"
+            onClick={() => setOnlySocios(!onlySocios)}
+            title="Ver solo las tareas de socios"
+            className={`inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm font-semibold transition ${onlySocios ? "border-stride-amber/60 bg-stride-amber/15 text-stride-amber" : "border-white/10 text-white/50 hover:text-white"}`}
+          >
+            <Lock className="h-3.5 w-3.5" /> Solo socios
+          </button>
         )}
 
         <div className="ml-auto flex items-center gap-2">

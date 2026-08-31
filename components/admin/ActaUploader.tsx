@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, CheckCircle2, AlertTriangle, ListTodo, Gavel, Eye } from "lucide-react";
+import { Loader2, CheckCircle2, AlertTriangle, ListTodo, Gavel, Eye, Lock } from "lucide-react";
 import { parseActa, type ParsedTask } from "@/lib/acta-parser";
 import { saveActa, type SaveActaResult } from "@/app/admin/actas/actions";
 
@@ -13,7 +13,9 @@ import { saveActa, type SaveActaResult } from "@/app/admin/actas/actions";
  * para que se pueda corregir el texto si algo salió mal en vez de terminar con
  * tareas basura en el sistema. El servidor vuelve a parsear al guardar.
  */
-export function ActaUploader() {
+type EditableTask = ParsedTask & { visibility: "equipo" | "socios" };
+
+export function ActaUploader({ isSocio }: { isSocio: boolean }) {
   const router = useRouter();
   const [content, setContent] = useState("");
   const [title, setTitle] = useState("");
@@ -25,12 +27,12 @@ export function ActaUploader() {
   const preview = useMemo(() => (content.trim() ? parseActa(content) : null), [content]);
   // Copia editable de las tareas: acá se corrigen fechas "A definir",
   // responsables y prioridades antes de crear nada.
-  const [tasks, setTasks] = useState<ParsedTask[]>([]);
+  const [tasks, setTasks] = useState<EditableTask[]>([]);
 
   // El acta trae su propio encabezado: al pegarla, los campos vacíos se
   // completan solos y cualquier corrección manual del usuario se respeta.
   useEffect(() => {
-    setTasks(preview?.tasks ?? []);
+    setTasks((preview?.tasks ?? []).map((t) => ({ ...t, visibility: "equipo" as const })));
     const header = preview?.header;
     if (!header) return;
     if (header.titleSuggestion) setTitle((v) => v || header.titleSuggestion!);
@@ -211,7 +213,7 @@ export function ActaUploader() {
                   </p>
                   <ul className="space-y-2">
                     {tasks.map((t, i) => {
-                      const patch = (changes: Partial<ParsedTask>) =>
+                      const patch = (changes: Partial<EditableTask>) =>
                         setTasks(tasks.map((x, j) => (j === i ? { ...x, ...changes } : x)));
                       return (
                         <li key={i} className="space-y-1.5 rounded-lg bg-white/5 p-2.5">
@@ -256,6 +258,17 @@ export function ActaUploader() {
                           </div>
                           {!t.dueDate && (
                             <p className="text-[10px] text-amber-300/80">Sin fecha (venía "A definir"): ponle una o quedará sin límite.</p>
+                          )}
+                          {isSocio && (
+                            <label className="flex w-fit cursor-pointer items-center gap-1.5 text-[10px] text-white/50">
+                              <input
+                                type="checkbox"
+                                checked={t.visibility === "socios"}
+                                onChange={(e) => patch({ visibility: e.target.checked ? "socios" : "equipo" })}
+                                className="h-3 w-3 accent-[#7C3AED]"
+                              />
+                              <Lock className="h-3 w-3 text-stride-amber" /> Solo socios
+                            </label>
                           )}
                         </li>
                       );
