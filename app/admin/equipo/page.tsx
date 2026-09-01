@@ -31,17 +31,18 @@ export default async function EquipoPage() {
       <header>
         <h1 className="font-heading text-3xl font-extrabold text-white">Equipo</h1>
         <p className="mt-1 max-w-2xl text-white/50">
-          {team.length} personas. Pincha la foto para cambiarla. Quien no tenga cuenta enlazada
-          aún no puede entrar al sistema.
+          {team.length} personas. Pincha la foto para cambiarla. Usa &ldquo;Dar acceso&rdquo; para enviar
+          la invitación al correo de cada persona; no necesitas copiar IDs desde Supabase.
         </p>
       </header>
 
       <TeamManager team={team} photoUrls={photoUrls} currentMemberId={me.id} />
 
       <p className="card text-sm leading-relaxed text-white/50">
-        Para darle acceso a alguien: crea su usuario en Supabase Auth con su email, y pega el ID de
-        ese usuario en la columna <code className="text-stride-accent">auth_user_id</code> de su
-        fila. Luego esa persona inscribe su app autenticadora en su primer ingreso.
+        El acceso al ERP lo define una fila activa en <code className="text-stride-accent">team_members</code>,
+        no el hecho de tener cuenta en Supabase Auth ni de ser miembro. Una misma cuenta puede ser
+        miembro y parte del equipo, pero solo entrará a Admin si está enlazada aquí. Tras activar su
+        contraseña, la persona podrá inscribir su app autenticadora desde Seguridad.
       </p>
     </div>
   );

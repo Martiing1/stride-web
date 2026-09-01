@@ -2,8 +2,8 @@
 
 import Image from "next/image";
 import { useRef, useState, useTransition, type FormEvent } from "react";
-import { Camera, Check, Loader2, Pencil, Plus, Trash2, UserRound, X } from "lucide-react";
-import { createTeamMember, deleteTeamMember, updateTeamMember, uploadTeamPhoto } from "@/app/admin/equipo/actions";
+import { Camera, Check, Loader2, Mail, Pencil, Plus, Trash2, UserRound, X } from "lucide-react";
+import { createTeamMember, deleteTeamMember, sendTeamInvitation, updateTeamMember, uploadTeamPhoto } from "@/app/admin/equipo/actions";
 import { ROLE_LABELS } from "@/lib/roles";
 import type { TeamMember } from "@/lib/types";
 
@@ -98,6 +98,17 @@ function PersonRow({
     });
   }
 
+  function sendAccess() {
+    if (!window.confirm(`¿Enviar acceso al ERP a ${person.email}?`)) return;
+    const form = new FormData();
+    form.set("id", person.id);
+    setError(null);
+    startTransition(async () => {
+      const result = await sendTeamInvitation(form);
+      if (!result.ok) setError(result.error ?? "No se pudo enviar el acceso.");
+    });
+  }
+
   return (
     <div className={`card py-4 ${person.status === "inactivo" ? "opacity-60" : ""}`}>
       <div className="flex flex-wrap items-center gap-4">
@@ -153,6 +164,17 @@ function PersonRow({
         )}
 
         <div className="flex shrink-0 gap-1.5">
+          {person.status === "activo" && (
+            <button
+              type="button"
+              onClick={sendAccess}
+              disabled={pending}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-stride-accent/35 px-3 py-2 text-xs font-semibold text-stride-accent hover:border-stride-accent hover:bg-stride-accent/10 disabled:opacity-50"
+            >
+              {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Mail className="h-3.5 w-3.5" />}
+              {person.auth_user_id ? "Reenviar acceso" : "Dar acceso"}
+            </button>
+          )}
           <button type="button" onClick={onEdit} className="rounded-lg border border-white/10 p-2 text-white/50 hover:text-white" aria-label="Editar">
             <Pencil className="h-3.5 w-3.5" />
           </button>

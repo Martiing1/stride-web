@@ -4,7 +4,8 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireTeamMember, getCurrentTeamMember } from "@/lib/auth";
-import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { createAuthApiClient, createClient, createServiceClient } from "@/lib/supabase/server";
+import { SITE } from "@/lib/site";
 
 export interface TeamResult {
   ok: boolean;
@@ -101,6 +102,75 @@ export async function deleteTeamMember(formData: FormData): Promise<TeamResult> 
   if (error) return { ok: false, error: "No se pudo eliminar: tiene historial asociado. Márcala como inactiva." };
 
   revalidatePath("/admin/equipo");
+  return { ok: true };
+}
+
+async function findAuthUserByEmail(email: string) {
+  const service = createServiceClient();
+  for (let page = 1; page <= 10; page++) {
+    const { data, error } = await service.auth.admin.listUsers({ page, perPage: 100 });
+    if (error) return null;
+
+    const user = data.users.find((candidate) => candidate.email?.toLowerCase() === email.toLowerCase());
+    if (user) return user;
+    if (data.users.length < 100) break;
+  }
+  return null;
+}
+
+/**
+ * Crea o vincula la cuenta de Auth de una persona del equipo y le manda el
+ * enlace para definir su contraseña. La autorización sigue viviendo en
+ * team_members: tener una cuenta de Auth o ser miembro no habilita el ERP.
+ */
+export async function sendTeamInvitation(formData: FormData): Promise<TeamResult> {
+  await requireTeamMember(["socio"]);
+  const id = z.string().uuid().safeParse(formData.get("id"));
+  if (!id.success) return { ok: false, error: "Persona inválida" };
+
+  const service = createServiceClient();
+  const { data: person } = await service
+    .from("team_members")
+    .select("id, full_name, email, status")
+    .eq("id", id.data)
+    .single();
+
+  if (!person) return { ok: false, error: "Persona no encontrada." };
+  if (person.status !== "activo") return { ok: false, error: "Activa a la persona antes de darle acceso." };
+
+  const redirectTo = `${SITE.url}/admin/activar`;
+  let authUser = await findAuthUserByEmail(person.email);
+
+  if (!authUser) {
+    // Supabase crea la cuenta y manda un enlace de invitación de un solo uso.
+    // Al abrirlo, /admin/activar permite definir la contraseña inicial.
+    const { data, error } = await service.auth.admin.inviteUserByEmail(person.email, {
+      redirectTo,
+      data: { full_name: person.full_name, account_type: "team" },
+    });
+    if (error || !data.user) {
+      return { ok: false, error: "No se pudo enviar la invitación. Revisa el correo e inténtalo otra vez." };
+    }
+    authUser = data.user;
+  } else {
+    // Una cuenta puede pertenecer a members y team_members a la vez. En ese
+    // caso no se duplica: se vincula la misma cuenta y se envía recuperación
+    // para que pueda definir (o renovar) su contraseña del ERP.
+    const authApi = createAuthApiClient();
+    const { error } = await authApi.auth.resetPasswordForEmail(person.email, { redirectTo });
+    if (error) {
+      return { ok: false, error: "No se pudo reenviar el acceso. Inténtalo nuevamente." };
+    }
+  }
+
+  const { error: linkError } = await service
+    .from("team_members")
+    .update({ auth_user_id: authUser.id })
+    .eq("id", person.id);
+  if (linkError) return { ok: false, error: "Se envió el correo, pero no pudimos enlazar la cuenta. Intenta nuevamente." };
+
+  revalidatePath("/admin/equipo");
+  revalidatePath("/admin", "layout");
   return { ok: true };
 }
 
