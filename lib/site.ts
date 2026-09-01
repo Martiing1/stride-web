@@ -6,6 +6,7 @@ export const SITE = {
   name: "STRIDE",
   city: "Concepción",
   url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://stridechile.cl",
+  adminUrl: process.env.NEXT_PUBLIC_ADMIN_URL ?? "https://admin.stridechile.cl",
 
   // TODO: reemplazar por los datos reales antes de publicar.
   whatsapp: "56934806986",

@@ -18,6 +18,18 @@ export async function middleware(request: NextRequest) {
   const url = request.nextUrl;
   const host = request.headers.get("host") ?? "";
   const isAdminHost = host.startsWith("admin.");
+
+  // El ERP se entrega solo en admin.stridechile.cl. No dejamos una segunda
+  // puerta visible en el dominio público: /admin/* vuelve a la portada. La
+  // activación es la excepción mínima, porque recibe un enlace de un solo uso
+  // para que una persona cree su contraseña antes de entrar al subdominio.
+  if (!isAdminHost && url.pathname.startsWith("/admin") && url.pathname !== "/admin/activar") {
+    const home = url.clone();
+    home.pathname = "/";
+    home.search = "";
+    return NextResponse.redirect(home);
+  }
+
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-stride-pathname", url.pathname);
 

@@ -43,6 +43,13 @@ administración de comunidad a un Líder de Comunidad.
 3. La persona entra después por `admin.stridechile.cl` con ese correo y
    contraseña; el segundo factor se configura dentro del ERP.
 
+## Aislamiento de URL del ERP
+
+- `admin.stridechile.cl` es la única entrada visible del ERP.
+- En `stridechile.cl`, cualquier ruta `/admin/*` vuelve a la portada; la única
+  excepción es `/admin/activar`, necesaria para que un enlace de un solo uso
+  permita definir la contraseña antes del primer ingreso.
+
 ## Regla de acceso resultante
 
 | Rol | ERP | Administración del portal `/miembros` |

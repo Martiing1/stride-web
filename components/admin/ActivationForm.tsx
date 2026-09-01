@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import { CheckCircle2, KeyRound, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { SITE } from "@/lib/site";
 
 type ActivationState = "checking" | "ready" | "saving" | "done" | "invalid";
 
 export function ActivationForm() {
-  const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const [state, setState] = useState<ActivationState>("checking");
   const [error, setError] = useState<string | null>(null);
@@ -111,8 +110,10 @@ export function ActivationForm() {
 
     setState("done");
     window.setTimeout(() => {
-      router.replace("/admin");
-      router.refresh();
+      // El ERP vive solo en el subdominio admin. La sesión de activación se
+      // crea en el dominio público, así que la persona entra allá usando la
+      // contraseña que acaba de definir.
+      window.location.assign(SITE.adminUrl);
     }, 700);
   }
 
