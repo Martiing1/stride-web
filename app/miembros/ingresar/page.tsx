@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { MemberLoginForm } from "@/components/member/MemberLoginForm";
 import { StrideLogo } from "@/components/StrideLogo";
-import { getCurrentMember } from "@/lib/member-auth";
+import { getCurrentMember, getCommunityStaff } from "@/lib/member-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -19,8 +19,8 @@ export default async function MemberLoginPage({
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
-  const member = await getCurrentMember();
-  if (member) redirect("/miembros");
+  const [member, staff] = await Promise.all([getCurrentMember(), getCommunityStaff()]);
+  if (member || staff) redirect("/miembros");
 
   const { error } = await searchParams;
   const errorMessage = error ? LOGIN_ERRORS[error] ?? LOGIN_ERRORS.enlace : null;

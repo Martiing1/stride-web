@@ -189,3 +189,79 @@ body {
     animation: none;
   }
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   COMUNIDAD DE MIEMBROS — tokens de tema (oscuro por defecto, claro opcional)
+   El área /miembros usa estas variables en vez de colores fijos, para que el
+   toggle de Config cambie todo el shell sin tocar el resto del sitio ni el ERP.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+.mshell {
+  --sbg: #0b0b0f;
+  --scard: #14141b;
+  --scard2: #0f0f15;
+  --sline: rgba(255, 255, 255, 0.07);
+  --sline2: rgba(255, 255, 255, 0.16);
+  --stext: #f4f4f8;
+  --smut: rgba(244, 244, 248, 0.58);
+  --sdim: rgba(244, 244, 248, 0.36);
+  --ssoft: rgba(124, 58, 237, 0.14);
+  --shover: rgba(255, 255, 255, 0.05);
+  background: var(--sbg);
+  color: var(--stext);
+}
+
+.mshell[data-mtheme="light"] {
+  --sbg: #f4f4f8;
+  --scard: #ffffff;
+  --scard2: #ececf2;
+  --sline: rgba(22, 22, 40, 0.09);
+  --sline2: rgba(22, 22, 40, 0.18);
+  --stext: #17171f;
+  --smut: rgba(23, 23, 31, 0.62);
+  --sdim: rgba(23, 23, 31, 0.42);
+  --ssoft: rgba(124, 58, 237, 0.1);
+  --shover: rgba(20, 20, 40, 0.05);
+}
+
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes m-pagein {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.m-pagein {
+  animation: m-pagein 0.28s ease;
+}
+
+@keyframes m-rowin {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.m-rowin {
+  animation: m-rowin 0.45s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .m-pagein,
+  .m-rowin {
+    animation: none;
+  }
+}

@@ -73,6 +73,29 @@ export const getCurrentMember = cache(async (): Promise<Member | null> => {
   return (data as Member | null) ?? null;
 });
 
+/**
+ * Staff en el área de miembros: si la sesión pertenece a un socio o líder del
+ * equipo, obtiene vista de administrador en /miembros (publicar como STRIDE,
+ * fijar posts, editar el classroom) aunque no tenga ficha de miembro.
+ */
+export const getCommunityStaff = cache(async () => {
+  const sessionClient = await createClient();
+  const {
+    data: { user },
+  } = await sessionClient.auth.getUser();
+  if (!user) return null;
+
+  const service = createServiceClient();
+  const { data } = await service
+    .from("team_members")
+    .select("id, full_name, nickname, role")
+    .eq("auth_user_id", user.id)
+    .eq("status", "activo")
+    .in("role", ["socio", "lider_comunidad"])
+    .maybeSingle();
+  return (data as { id: string; full_name: string; nickname: string | null; role: string } | null) ?? null;
+});
+
 export async function getSignedMemberPhoto(member: Pick<Member, "photo_path" | "photo_url">) {
   if (member.photo_path) {
     const service = createServiceClient();
