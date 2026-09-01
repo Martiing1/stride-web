@@ -37,10 +37,9 @@ export const MODULES: ModuleDef[] = [
   { href: "/admin/metricas", label: "Métricas", section: "Social Run", roles: ["socio", "lider_comunidad"] },
   { href: "/admin/membresia", label: "Plan del mes", section: "Membresía", roles: ["socio", "lider_comunidad"] },
   { href: "/admin/comunidad", label: "Comunidad", section: "Membresía", roles: ["socio", "lider_comunidad"] },
-  // Vista de admin dentro del área de miembros (dominio principal): el staff
-  // entra a /miembros con superpoderes — publicar como STRIDE, fijar posts y
-  // editar el classroom en el lugar.
-  { href: "https://stridechile.cl/miembros", label: "Vista Miembros ↗", section: "Membresía", roles: ["socio", "lider_comunidad"] },
+  // Administración del portal de miembros: reservada a socios. Líderes y
+  // monitores operan el ERP, pero no publican ni gestionan este portal.
+  { href: "https://stridechile.cl/miembros", label: "Vista Miembros ↗", section: "Membresía", roles: ["socio"] },
   { href: "/admin/miembros", label: "Miembros", section: "Membresía", roles: ["socio", "lider_comunidad"], ownerOnly: true },
   { href: "/admin/escaneos", label: "Escaneos", section: "Membresía", roles: ["socio", "lider_comunidad"] },
   { href: "/admin/convenios", label: "Convenios", section: "Membresía", roles: ["socio", "lider_comunidad"] },

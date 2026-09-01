@@ -74,9 +74,9 @@ export const getCurrentMember = cache(async (): Promise<Member | null> => {
 });
 
 /**
- * Staff en el área de miembros: si la sesión pertenece a un socio o líder del
- * equipo, obtiene vista de administrador en /miembros (publicar como STRIDE,
- * fijar posts, editar el classroom) aunque no tenga ficha de miembro.
+ * Solo los socios administran el área de miembros (publicar como STRIDE,
+ * fijar posts y editar el classroom). Líderes y monitores no reciben estos
+ * privilegios aunque tengan una cuenta activa en el ERP.
  */
 export const getCommunityStaff = cache(async () => {
   const sessionClient = await createClient();
@@ -91,7 +91,7 @@ export const getCommunityStaff = cache(async () => {
     .select("id, full_name, nickname, role")
     .eq("auth_user_id", user.id)
     .eq("status", "activo")
-    .in("role", ["socio", "lider_comunidad"])
+    .eq("role", "socio")
     .maybeSingle();
   return (data as { id: string; full_name: string; nickname: string | null; role: string } | null) ?? null;
 });
