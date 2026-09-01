@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import { Check, Eye, EyeOff, LayoutDashboard, Loader2, ShieldCheck, Tags, Users } from "lucide-react";
+import { Check, Eye, EyeOff, LayoutDashboard, Loader2, ShieldCheck, Tags, Users, X } from "lucide-react";
 import { saveBoardLabels, saveDashboardWidgets, saveRoleModules } from "@/app/admin/configuracion/actions";
 import { DASHBOARD_WIDGETS, type ModuleDef, type WidgetId } from "@/lib/app-settings";
 import { ROLE_LABELS } from "@/lib/roles";
@@ -44,6 +44,7 @@ export function RolePermissionsEditor({
     lider_comunidad: new Set(initialHidden.lider_comunidad ?? []),
     monitor: new Set(initialHidden.monitor ?? []),
   });
+  const [previewRole, setPreviewRole] = useState<(typeof EDITABLE_ROLES)[number] | null>(null);
   const [message, setMessage] = useState<SaveState>(null);
   const [pending, startTransition] = useTransition();
 
@@ -86,6 +87,18 @@ export function RolePermissionsEditor({
           ))}
         </div>
       </div>
+      <div className="flex flex-wrap gap-2">
+        {EDITABLE_ROLES.map((r) => (
+          <button
+            key={r}
+            type="button"
+            onClick={() => setPreviewRole(r)}
+            className="inline-flex items-center gap-2 rounded-full border border-stride-cyan/35 px-4 py-2 text-sm font-semibold text-stride-cyan transition hover:border-stride-cyan hover:bg-stride-cyan/10"
+          >
+            <Eye className="h-4 w-4" /> Ver vista de {ROLE_LABELS[r]}
+          </button>
+        ))}
+      </div>
       <p className="text-sm text-white/45">
         Así se ve el menú de un {ROLE_LABELS[role].toLowerCase()}. Apaga lo que no deba ver;
         lo que es solo de socios ni siquiera aparece acá.
@@ -124,7 +137,83 @@ export function RolePermissionsEditor({
       </div>
 
       <SaveBar pending={pending} message={message} onSave={save} />
+
+      {previewRole && (
+        <RolePreview
+          role={previewRole}
+          modules={modules}
+          hidden={hidden[previewRole]}
+          onClose={() => setPreviewRole(null)}
+        />
+      )}
     </section>
+  );
+}
+
+/** Vista visual, no navegable, para revisar el ERP sin cambiar de cuenta. */
+function RolePreview({
+  role,
+  modules,
+  hidden,
+  onClose,
+}: {
+  role: (typeof EDITABLE_ROLES)[number];
+  modules: ModuleDef[];
+  hidden: Set<string>;
+  onClose: () => void;
+}) {
+  const visible = modules.filter(
+    (module) => (!module.roles || module.roles.includes(role)) && (module.fixed || !hidden.has(module.href))
+  );
+  const sections = Array.from(new Set(visible.map((module) => module.section)));
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 p-4 backdrop-blur-sm sm:p-8" role="dialog" aria-modal="true" aria-label={`Vista de ${ROLE_LABELS[role]}`}>
+      <div className="mx-auto min-h-[620px] max-w-6xl overflow-hidden rounded-2xl border border-white/15 bg-stride-bg shadow-2xl">
+        <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-stride-cyan">Vista previa</p>
+            <h3 className="font-heading text-lg font-bold text-white">Lo que ve un {ROLE_LABELS[role]}</h3>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-lg border border-white/10 p-2 text-white/60 hover:text-white" aria-label="Cerrar vista previa">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="flex min-h-[550px]">
+          <aside className="hidden w-64 shrink-0 border-r border-white/10 bg-black/20 p-4 sm:block">
+            <p className="mb-6 font-heading text-xl font-extrabold text-white">STRIDE</p>
+            <div className="space-y-5">
+              {sections.map((section) => (
+                <div key={section}>
+                  <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-widest text-white/30">{section}</p>
+                  {visible.filter((module) => module.section === section).map((module) => (
+                    <div key={module.href} className="rounded-lg px-2 py-1.5 text-sm text-white/65">{module.label}</div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </aside>
+
+          <main className="min-w-0 flex-1 p-6 sm:p-9">
+            <p className="text-sm text-white/45">Sistema interno</p>
+            <h4 className="mt-1 font-heading text-3xl font-extrabold text-white">Hola, {ROLE_LABELS[role]}</h4>
+            <p className="mt-2 max-w-xl text-sm leading-relaxed text-white/50">
+              Esta previsualización refleja los módulos visibles con la configuración actual. No cambia
+              tu sesión ni da permisos adicionales.
+            </p>
+            <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {visible.slice(0, 6).map((module) => (
+                <div key={module.href} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                  <p className="text-sm text-white/45">Módulo disponible</p>
+                  <p className="mt-1 font-heading text-lg font-bold text-white">{module.label}</p>
+                </div>
+              ))}
+            </div>
+          </main>
+        </div>
+      </div>
+    </div>
   );
 }
 
