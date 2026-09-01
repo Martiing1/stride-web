@@ -40,7 +40,7 @@ const lessons = [
 `Bienvenido al Equipo StrideOne. En este video te contamos lo que hacemos y por qué lo hacemos — para que te sientas cómodo, salgas de tu zona de confort y, por sobre todo, disfrutes haciendo deporte.
 
 Después de verlo: preséntate en el Blog (canal Presentación) y crea tus hábitos del mes.`,
-    "video · 3 min", "https://www.youtube.com/embed/ewE2avvIz8o"),
+    "video · 3 min", "https://www.youtube.com/embed/ewE2avvlz8o"),
 
   L("Semana 1 — Entrena y Actívate",
 `Es tu primera semana oficial en StrideOne. La meta no es correr rápido ni lejos: es descubrir que moverse es mejor acompañado.
