@@ -1,7 +1,8 @@
 import clsx from "clsx";
-import { getCurrentMember } from "@/lib/member-auth";
+import { getCurrentMember, getCommunityStaff } from "@/lib/member-auth";
 import { getMonthlyRanking, getPointsWeights } from "@/lib/community";
 import { todayInChile } from "@/lib/membership";
+import { PointsAdminPanel } from "@/components/community/PointsAdminPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,7 @@ function initialsOf(name: string) {
 
 /** Ranking mensual por puntos, con entrada animada del podio y las filas. */
 export default async function RankingPage() {
-  const member = await getCurrentMember();
+  const [member, staff] = await Promise.all([getCurrentMember(), getCommunityStaff()]);
   const [{ rows, mine }, weights] = await Promise.all([
     getMonthlyRanking(member?.id ?? "00000000-0000-0000-0000-000000000000"),
     getPointsWeights(),
@@ -119,6 +120,8 @@ export default async function RankingPage() {
           )}
         </div>
       )}
+
+      {staff && <PointsAdminPanel initial={weights} />}
 
       <div className="rounded-2xl border border-[var(--sline)] bg-[var(--scard)] p-4 text-xs leading-relaxed text-[var(--smut)]">
         El <b className="text-[var(--stext)]">Nº1 del mes</b> gana premio + medalla automática; la tabla parte

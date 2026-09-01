@@ -711,3 +711,56 @@ export async function notify(
   });
   if (error) console.error("[community] notify", error.message);
 }
+
+// ─── Vistas de admin (staff dentro de /miembros) ─────────────────────────────
+
+export interface AdminChallengeRow {
+  id: string;
+  title: string;
+  description: string | null;
+  period: "mes" | "semana" | "hito" | "general";
+  criterio: "asistencia" | "cantidad" | "evidencia";
+  goal: number;
+  points: number;
+  medal_id: string | null;
+  month: string | null;
+  active: boolean;
+}
+
+/** Todos los retos (activos e inactivos) para el panel de gestión en Retos. */
+export async function getChallengesAdmin(): Promise<AdminChallengeRow[]> {
+  const service = createServiceClient();
+  return safeQuery(
+    () =>
+      service
+        .from("challenges")
+        .select("id, title, description, period, criterio, goal, points, medal_id, month, active")
+        .order("active", { ascending: false })
+        .order("period")
+        .order("created_at", { ascending: false })
+        .returns<AdminChallengeRow[]>(),
+    [] as AdminChallengeRow[]
+  );
+}
+
+export interface MedalOption {
+  id: string;
+  name: string;
+  emoji: string;
+  rarity: string;
+}
+
+/** Medallas activas para asociar a un reto. */
+export async function getMedalOptions(): Promise<MedalOption[]> {
+  const service = createServiceClient();
+  return safeQuery(
+    () =>
+      service
+        .from("medals")
+        .select("id, name, emoji, rarity")
+        .eq("active", true)
+        .order("name")
+        .returns<MedalOption[]>(),
+    [] as MedalOption[]
+  );
+}

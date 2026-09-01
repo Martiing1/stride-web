@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getCurrentMember, getCommunityStaff } from "@/lib/member-auth";
 import { todayInChile } from "@/lib/membership";
-import { addPoints, getPointsWeights, notify, MAX_HABITS, type Channel } from "@/lib/community";
+import { addPoints, getPointsWeights, notify, MAX_HABITS, DEFAULT_POINTS, type Channel, type PointsWeights } from "@/lib/community";
 import { detectImage, detectVideo } from "@/lib/uploads";
 
 /**
@@ -862,5 +862,179 @@ export async function toggleLesson(lessonId: string, done: boolean): Promise<Act
     await service.from("lesson_progress").delete().eq("lesson_id", lessonId).eq("member_id", member.id);
   }
   revalidatePath("/miembros/classroom");
+  return { ok: true };
+}
+
+// ─── Staff · calendario ──────────────────────────────────────────────────────
+
+const EVENT_TYPES = ["social_run", "social_run_cafeteria", "social_run_sunset", "sesion_online", "club_lectura", "marca", "retiro", "race_trip", "otro"];
+
+/** Crea o edita un evento del calendario sin salir de /miembros. */
+export async function staffSaveEvent(formData: FormData): Promise<ActionResult> {
+  let staff;
+  try {
+    staff = await requireStaff();
+  } catch {
+    return err("Solo el staff puede gestionar eventos.");
+  }
+  const service = createServiceClient();
+
+  const id = String(formData.get("id") ?? "") || null;
+  const title = String(formData.get("title") ?? "").trim();
+  const eventType = String(formData.get("event_type") ?? "social_run");
+  const eventDate = String(formData.get("event_date") ?? "");
+  const eventTime = String(formData.get("event_time") ?? "") || null;
+  const meetingPoint = String(formData.get("meeting_point") ?? "").trim() || null;
+  const meetUrl = String(formData.get("meet_url") ?? "").trim() || null;
+  const distanceRaw = Number(formData.get("distance_km"));
+  const distanceKm = Number.isFinite(distanceRaw) && distanceRaw > 0 ? distanceRaw : null;
+  const eventlyUrl = String(formData.get("evently_url") ?? "").trim() || null;
+
+  if (!title) return err("Ponle nombre al evento.");
+  if (!EVENT_TYPES.includes(eventType)) return err("Tipo de evento inválido.");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) return err("Elige la fecha.");
+  if (meetUrl && !/^https?:\/\//.test(meetUrl)) return err("El link de la sesión debe partir con https://");
+  if (eventlyUrl && !/^https?:\/\//.test(eventlyUrl)) return err("El link de Evently debe partir con https://");
+
+  // Cada tipo guarda solo sus variables: así cambiar el tipo al editar no
+  // deja campos colgando del tipo anterior.
+  const online = eventType === "sesion_online";
+  const isRun = eventType.startsWith("social_run");
+  const row = {
+    title,
+    event_type: eventType,
+    event_date: eventDate,
+    event_time: eventTime,
+    meeting_point: online ? null : meetingPoint,
+    meet_url: online ? meetUrl : null,
+    distance_km: isRun ? distanceKm : null,
+    evently_url: isRun ? eventlyUrl : null,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (id) {
+    const { error } = await service.from("events").update(row).eq("id", id);
+    if (error) return err("No pudimos guardar los cambios del evento.");
+  } else {
+    // Nace confirmado: si el staff lo crea aquí es porque va sí o sí.
+    const { error } = await service
+      .from("events")
+      .insert({ ...row, status: "confirmado", owner_id: staff.id });
+    if (error) return err("No pudimos crear el evento.");
+  }
+  revalidatePath("/miembros/calendario");
+  revalidatePath("/miembros");
+  return { ok: true };
+}
+
+/** Elimina un evento (los RSVP y la asistencia caen en cascada). */
+export async function staffDeleteEvent(eventId: string): Promise<ActionResult> {
+  try {
+    await requireStaff();
+  } catch {
+    return err("Solo el staff puede gestionar eventos.");
+  }
+  const service = createServiceClient();
+  const { error } = await service.from("events").delete().eq("id", eventId);
+  if (error) return err("No pudimos eliminar el evento.");
+  revalidatePath("/miembros/calendario");
+  revalidatePath("/miembros");
+  return { ok: true };
+}
+
+// ─── Staff · retos ───────────────────────────────────────────────────────────
+
+/** Crea o edita un reto desde la propia sección Retos. */
+export async function staffSaveChallenge(formData: FormData): Promise<ActionResult> {
+  let staff;
+  try {
+    staff = await requireStaff();
+  } catch {
+    return err("Solo el staff puede gestionar retos.");
+  }
+  const service = createServiceClient();
+
+  const id = String(formData.get("id") ?? "") || null;
+  const title = String(formData.get("title") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim() || null;
+  const period = String(formData.get("period") ?? "mes");
+  const criterio = String(formData.get("criterio") ?? "cantidad");
+  const goal = Math.max(1, Math.round(Number(formData.get("goal")) || 1));
+  const points = Math.max(0, Math.round(Number(formData.get("points")) || 0));
+  const medalId = String(formData.get("medal_id") ?? "") || null;
+
+  if (!title) return err("Ponle título al reto.");
+  if (!["mes", "semana", "hito", "general"].includes(period)) return err("Período inválido.");
+  if (!["asistencia", "cantidad", "evidencia"].includes(criterio)) return err("Criterio inválido.");
+
+  // Los retos del mes y micro-retos pertenecen a un mes (editable, así se
+  // pueden dejar preparados los del próximo); hitos y generales no expiran.
+  const monthInput = String(formData.get("month") ?? "");
+  const monthly = period === "mes" || period === "semana";
+  if (monthly && monthInput && !/^\d{4}-\d{2}$/.test(monthInput)) return err("Elige el mes del reto.");
+  const month = monthly ? (monthInput || todayInChile().slice(0, 7)) + "-01" : null;
+  const row = { title, description, period, criterio, goal, points, medal_id: medalId, month };
+
+  if (id) {
+    const { error } = await service.from("challenges").update(row).eq("id", id);
+    if (error) return err("No pudimos guardar los cambios del reto.");
+  } else {
+    const { error } = await service.from("challenges").insert({ ...row, created_by: staff.id });
+    if (error) return err("No pudimos crear el reto.");
+  }
+  revalidatePath("/miembros/retos");
+  return { ok: true };
+}
+
+/** Activa o desactiva un reto (desactivado deja de verse, sin borrar avances). */
+export async function staffToggleChallenge(challengeId: string, active: boolean): Promise<ActionResult> {
+  try {
+    await requireStaff();
+  } catch {
+    return err("Solo el staff puede gestionar retos.");
+  }
+  const service = createServiceClient();
+  const { error } = await service.from("challenges").update({ active }).eq("id", challengeId);
+  if (error) return err("No pudimos actualizar el reto.");
+  revalidatePath("/miembros/retos");
+  return { ok: true };
+}
+
+/** Elimina un reto y todo su progreso (cascada). */
+export async function staffDeleteChallenge(challengeId: string): Promise<ActionResult> {
+  try {
+    await requireStaff();
+  } catch {
+    return err("Solo el staff puede gestionar retos.");
+  }
+  const service = createServiceClient();
+  const { error } = await service.from("challenges").delete().eq("id", challengeId);
+  if (error) return err("No pudimos eliminar el reto.");
+  revalidatePath("/miembros/retos");
+  return { ok: true };
+}
+
+// ─── Staff · puntos ──────────────────────────────────────────────────────────
+
+/** Guarda los pesos de puntos desde el apartado Ranking. */
+export async function staffSavePoints(input: Record<string, number>): Promise<ActionResult> {
+  try {
+    await requireStaff();
+  } catch {
+    return err("Solo el staff puede editar los puntos.");
+  }
+  const service = createServiceClient();
+
+  const clean: PointsWeights = { ...DEFAULT_POINTS };
+  for (const key of Object.keys(DEFAULT_POINTS) as Array<keyof PointsWeights>) {
+    const value = Number(input[key]);
+    if (Number.isFinite(value) && value >= 0 && value <= 1000) clean[key] = Math.round(value);
+  }
+
+  const { error } = await service
+    .from("community_config")
+    .upsert({ key: "points", value: clean, updated_at: new Date().toISOString() }, { onConflict: "key" });
+  if (error) return err("No pudimos guardar los puntos.");
+  revalidatePath("/miembros/ranking");
   return { ok: true };
 }

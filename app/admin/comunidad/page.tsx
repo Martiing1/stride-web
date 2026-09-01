@@ -9,7 +9,7 @@ export const metadata = { title: "Comunidad" };
 
 /**
  * Hub de la comunidad en el ERP: cola de verificación (evidencias de retos,
- * medallas físicas y pausas) + accesos a retos, asistencia y configuración.
+ * medallas físicas y pausas) + import de asistencia; retos y puntos viven en /miembros.
  */
 export default async function ComunidadPage() {
   await requireTeamMember(["socio", "lider_comunidad"]);
@@ -110,14 +110,15 @@ export default async function ComunidadPage() {
           </p>
         </div>
         <nav className="flex flex-wrap gap-2">
-          <Link href="/admin/comunidad/retos" className="rounded-full border border-white/15 px-4 py-2 text-sm font-semibold text-white/80 hover:bg-white/5">
-            🎯 Retos
-          </Link>
           <Link href="/admin/comunidad/asistencia" className="rounded-full border border-white/15 px-4 py-2 text-sm font-semibold text-white/80 hover:bg-white/5">
             📥 Asistencia (Evently)
           </Link>
-          <Link href="/admin/comunidad/config" className="rounded-full border border-white/15 px-4 py-2 text-sm font-semibold text-white/80 hover:bg-white/5">
-            ⚙️ Puntos
+          {/* Retos y puntos se gestionan en el lugar, dentro del área de miembros. */}
+          <Link href="https://stridechile.cl/miembros/retos" className="rounded-full border border-white/15 px-4 py-2 text-sm font-semibold text-white/80 hover:bg-white/5">
+            🎯 Retos (en Miembros) ↗
+          </Link>
+          <Link href="https://stridechile.cl/miembros/ranking" className="rounded-full border border-white/15 px-4 py-2 text-sm font-semibold text-white/80 hover:bg-white/5">
+            ⚙️ Puntos (en Miembros) ↗
           </Link>
         </nav>
       </header>

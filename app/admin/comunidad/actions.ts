@@ -3,12 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { requireTeamMember } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
-import { addPoints, getPointsWeights, notify, DEFAULT_POINTS, type PointsWeights } from "@/lib/community";
+import { addPoints, getPointsWeights, notify } from "@/lib/community";
 
 /**
  * Acciones del staff sobre la comunidad: verificar retos, validar medallas
- * físicas, resolver pausas, crear retos, importar asistencia de Evently y
- * ajustar los pesos de puntos.
+ * físicas, resolver pausas e importar asistencia de Evently. (Crear retos y
+ * ajustar puntos se hace en el lugar, dentro de /miembros.)
  */
 
 export interface AdminResult {
@@ -146,71 +146,6 @@ export async function resolvePause(pauseId: string, approve: boolean): Promise<A
     href: "/miembros/perfil",
   });
   revalidatePath("/admin/comunidad");
-  return { ok: true };
-}
-
-// ─── Retos: crear / activar ──────────────────────────────────────────────────
-
-export async function createChallenge(formData: FormData): Promise<AdminResult> {
-  const staff = await requireTeamMember(["socio", "lider_comunidad"]);
-  const service = createServiceClient();
-
-  const title = String(formData.get("title") ?? "").trim();
-  const description = String(formData.get("description") ?? "").trim() || null;
-  const period = String(formData.get("period") ?? "mes");
-  const criterio = String(formData.get("criterio") ?? "cantidad");
-  const goal = Math.max(1, Number(formData.get("goal") ?? 1) || 1);
-  const points = Math.max(0, Number(formData.get("points") ?? 0) || 0);
-  const medalId = String(formData.get("medal_id") ?? "") || null;
-  if (!title) return err("Ponle título al reto.");
-  if (!["mes", "semana", "hito", "general"].includes(period)) return err("Período inválido.");
-  if (!["asistencia", "cantidad", "evidencia"].includes(criterio)) return err("Criterio inválido.");
-
-  const month =
-    period === "mes" || period === "semana" ? new Date().toISOString().slice(0, 7) + "-01" : null;
-
-  const { error } = await service.from("challenges").insert({
-    title,
-    description,
-    period,
-    criterio,
-    goal,
-    points,
-    medal_id: medalId,
-    month,
-    created_by: staff.id,
-  });
-  if (error) return err("No pudimos crear el reto.");
-  revalidatePath("/admin/comunidad/retos");
-  return { ok: true };
-}
-
-export async function toggleChallenge(challengeId: string, active: boolean): Promise<AdminResult> {
-  await requireTeamMember(["socio", "lider_comunidad"]);
-  const service = createServiceClient();
-  const { error } = await service.from("challenges").update({ active }).eq("id", challengeId);
-  if (error) return err("No pudimos actualizar el reto.");
-  revalidatePath("/admin/comunidad/retos");
-  return { ok: true };
-}
-
-// ─── Config de puntos ────────────────────────────────────────────────────────
-
-export async function savePointsWeights(input: Partial<PointsWeights>): Promise<AdminResult> {
-  await requireTeamMember(["socio", "lider_comunidad"]);
-  const service = createServiceClient();
-
-  const clean: PointsWeights = { ...DEFAULT_POINTS };
-  for (const key of Object.keys(DEFAULT_POINTS) as Array<keyof PointsWeights>) {
-    const value = Number(input[key]);
-    if (Number.isFinite(value) && value >= 0 && value <= 1000) clean[key] = Math.round(value);
-  }
-
-  const { error } = await service
-    .from("community_config")
-    .upsert({ key: "points", value: clean, updated_at: new Date().toISOString() }, { onConflict: "key" });
-  if (error) return err("No pudimos guardar la configuración.");
-  revalidatePath("/admin/comunidad/config");
   return { ok: true };
 }
 

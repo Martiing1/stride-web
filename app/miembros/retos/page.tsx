@@ -1,6 +1,7 @@
-import { getCurrentMember } from "@/lib/member-auth";
-import { getChallenges, getMonthlyRanking } from "@/lib/community";
+import { getCurrentMember, getCommunityStaff } from "@/lib/member-auth";
+import { getChallenges, getChallengesAdmin, getMedalOptions, getMonthlyRanking } from "@/lib/community";
 import { ChallengeCard } from "@/components/community/ChallengeCard";
+import { ChallengeAdminPanel } from "@/components/community/ChallengeAdminPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -8,11 +9,13 @@ const MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", 
 
 /** Retos: del mes, micro-retos, generales e hitos permanentes. */
 export default async function RetosPage() {
-  const member = await getCurrentMember();
+  const [member, staff] = await Promise.all([getCurrentMember(), getCommunityStaff()]);
   const viewerId = member?.id ?? "00000000-0000-0000-0000-000000000000";
-  const [challenges, ranking] = await Promise.all([
+  const [challenges, ranking, adminChallenges, medals] = await Promise.all([
     getChallenges(viewerId),
     getMonthlyRanking(viewerId),
+    staff ? getChallengesAdmin() : Promise.resolve([]),
+    staff ? getMedalOptions() : Promise.resolve([]),
   ]);
 
   const delMes = challenges.filter((c) => c.period === "mes");
@@ -29,6 +32,8 @@ export default async function RetosPage() {
           {ranking.mine} pts este mes
         </span>
       </div>
+
+      {staff && <ChallengeAdminPanel challenges={adminChallenges} medals={medals} />}
 
       {challenges.length === 0 && (
         <div className="rounded-2xl border border-dashed border-[var(--sline2)] p-10 text-center">
