@@ -7,6 +7,7 @@ import {
   getHabitsToday,
   getMemberEvents,
   getMonthlyRanking,
+  memberDisplayName,
 } from "@/lib/community";
 import { formatDateCL } from "@/lib/membership";
 import { HabitsWidget } from "@/components/community/HabitsWidget";
@@ -51,7 +52,7 @@ export default async function BlogPage({
       )
     : feedRaw;
 
-  const initials = (member?.full_name ?? staff?.full_name ?? "S")
+  const initials = ((member ? memberDisplayName(member) : null) ?? staff?.full_name ?? "S")
     .split(" ")
     .slice(0, 2)
     .map((part) => part[0] ?? "")

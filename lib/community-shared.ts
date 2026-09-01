@@ -30,3 +30,8 @@ export const DEFAULT_POINTS: PointsWeights = {
 };
 
 export const MAX_HABITS = 4;
+
+/** Nombre con el que un miembro aparece en la comunidad (Blog, Ranking, comentarios). */
+export function memberDisplayName(m: { display_name?: string | null; full_name: string }): string {
+  return m.display_name?.trim() || m.full_name;
+}

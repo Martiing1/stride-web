@@ -8,6 +8,8 @@ import { isMembershipValid, formatDateCL } from "@/lib/membership";
 import { whatsappLink } from "@/lib/site";
 import { ThemeToggle } from "@/components/community/ThemeToggle";
 import { PauseCard } from "@/components/community/PauseCard";
+import { DisplayNameForm } from "@/components/community/DisplayNameForm";
+import { memberDisplayName } from "@/lib/community-shared";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +45,12 @@ export default async function ConfigPage() {
       </Link>
 
       <h1 className="font-heading text-xl font-bold">Configuración</h1>
+
+      <section className="rounded-2xl border border-[var(--sline)] bg-[var(--scard)] p-5">
+        <h2 className="font-heading text-base font-bold">Tu nombre</h2>
+        <p className="mt-1 text-sm text-[var(--smut)]">Cómo quieres aparecer en la comunidad.</p>
+        <DisplayNameForm initial={memberDisplayName(member)} realName={member.full_name} />
+      </section>
 
       <section className="rounded-2xl border border-[var(--sline)] bg-[var(--scard)] p-5">
         <h2 className="font-heading text-base font-bold">Apariencia</h2>

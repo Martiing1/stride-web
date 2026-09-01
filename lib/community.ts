@@ -138,9 +138,9 @@ export interface MemberNotification {
   created_at: string;
 }
 
-import { DEFAULT_POINTS, type PointsWeights } from "./community-shared";
+import { DEFAULT_POINTS, memberDisplayName, type PointsWeights } from "./community-shared";
 
-export { DEFAULT_POINTS, MAX_HABITS, type PointsWeights } from "./community-shared";
+export { DEFAULT_POINTS, MAX_HABITS, memberDisplayName, type PointsWeights } from "./community-shared";
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
@@ -199,11 +199,11 @@ export async function getMonthlyRanking(myMemberId: string): Promise<{ rows: Ran
     () =>
       service
         .from("points_ledger")
-        .select("member_id, points, members!inner(full_name)")
+        .select("member_id, points, members!inner(full_name, display_name)")
         .gte("created_at", from)
         .lt("created_at", to)
-        .returns<Array<{ member_id: string; points: number; members: { full_name: string } }>>(),
-    [] as Array<{ member_id: string; points: number; members: { full_name: string } }>
+        .returns<Array<{ member_id: string; points: number; members: { full_name: string; display_name: string | null } }>>(),
+    [] as Array<{ member_id: string; points: number; members: { full_name: string; display_name: string | null } }>
   );
 
   const byMember = new Map<string, RankingRow>();
@@ -213,7 +213,7 @@ export async function getMonthlyRanking(myMemberId: string): Promise<{ rows: Ran
     else
       byMember.set(row.member_id, {
         member_id: row.member_id,
-        full_name: row.members?.full_name ?? "Miembro",
+        full_name: row.members ? memberDisplayName(row.members) : "Miembro",
         points: row.points,
         is_me: row.member_id === myMemberId,
       });
@@ -238,7 +238,7 @@ interface RawPost {
   member_medal_id: string | null;
   event_id: string | null;
   created_at: string;
-  members: { full_name: string } | null;
+  members: { full_name: string; display_name: string | null } | null;
   team_members: { full_name: string; nickname: string | null } | null;
 }
 
@@ -248,7 +248,7 @@ export async function getFeed(myMemberId: string | null, channel?: Channel | "al
   let query = service
     .from("community_posts")
     .select(
-      "id, channel, title, body, photo_paths, video_url, is_pinned, author_member_id, author_team_member_id, member_medal_id, event_id, created_at, members:author_member_id(full_name), team_members:author_team_member_id(full_name, nickname)"
+      "id, channel, title, body, photo_paths, video_url, is_pinned, author_member_id, author_team_member_id, member_medal_id, event_id, created_at, members:author_member_id(full_name, display_name), team_members:author_team_member_id(full_name, nickname)"
     )
     .order("is_pinned", { ascending: false })
     .order("created_at", { ascending: false })
@@ -265,11 +265,11 @@ export async function getFeed(myMemberId: string | null, channel?: Channel | "al
       [] as Array<{ post_id: string; member_id: string }>
     ),
     (async () => {
-      type RawComment = { id: string; post_id: string; parent_id: string | null; body: string; created_at: string; author_member_id: string | null; members: { full_name: string } | null; team_members: { full_name: string; nickname: string | null } | null };
+      type RawComment = { id: string; post_id: string; parent_id: string | null; body: string; created_at: string; author_member_id: string | null; members: { full_name: string; display_name: string | null } | null; team_members: { full_name: string; nickname: string | null } | null };
       try {
         const withParent = await service
           .from("community_comments")
-          .select("id, post_id, parent_id, body, created_at, author_member_id, members:author_member_id(full_name), team_members:author_team_member_id(full_name, nickname)")
+          .select("id, post_id, parent_id, body, created_at, author_member_id, members:author_member_id(full_name, display_name), team_members:author_team_member_id(full_name, nickname)")
           .in("post_id", ids)
           .order("created_at")
           .returns<RawComment[]>();
@@ -277,7 +277,7 @@ export async function getFeed(myMemberId: string | null, channel?: Channel | "al
         // Migración 013 pendiente: reintenta sin parent_id (hilos planos).
         const legacy = await service
           .from("community_comments")
-          .select("id, post_id, body, created_at, author_member_id, members:author_member_id(full_name), team_members:author_team_member_id(full_name, nickname)")
+          .select("id, post_id, body, created_at, author_member_id, members:author_member_id(full_name, display_name), team_members:author_team_member_id(full_name, nickname)")
           .in("post_id", ids)
           .order("created_at")
           .returns<Array<Omit<RawComment, "parent_id">>>();
@@ -327,7 +327,7 @@ export async function getFeed(myMemberId: string | null, channel?: Channel | "al
       created_at: c.created_at,
       is_staff: !c.author_member_id,
       is_mine: c.author_member_id === myMemberId,
-      author_name: c.members?.full_name ?? c.team_members?.nickname ?? c.team_members?.full_name ?? "STRIDE",
+      author_name: (c.members ? memberDisplayName(c.members) : null) ?? c.team_members?.nickname ?? c.team_members?.full_name ?? "STRIDE",
     });
     commentsByPost.set(c.post_id, list);
   }
@@ -347,7 +347,7 @@ export async function getFeed(myMemberId: string | null, channel?: Channel | "al
       ),
       video_url: p.video_url,
       is_pinned: p.is_pinned,
-      author_name: p.author_member_id ? p.members?.full_name ?? "Miembro" : "STRIDE",
+      author_name: p.author_member_id ? p.members ? memberDisplayName(p.members) : "Miembro" : "STRIDE",
       is_staff: !p.author_member_id,
       is_mine: Boolean(p.author_member_id && p.author_member_id === myMemberId),
       event: eventRow,

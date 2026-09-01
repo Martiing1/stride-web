@@ -115,7 +115,7 @@ export function HabitsWidget({ initial }: { initial: HabitsToday }) {
 
   if (collapsed && !editing) {
     return (
-      <button type="button" onClick={() => setCollapsed(false)} className="gradient-border w-full text-left">
+      <button type="button" onClick={() => setCollapsed(false)} className="gradient-border w-full text-left" data-tour="habitos">
         <div className="flex items-center gap-3 rounded-[calc(1.5rem-1.5px)] bg-[var(--scard)] px-4 py-3.5">
           <span className="text-2xl">🔥</span>
           <span className="min-w-0">
@@ -129,7 +129,7 @@ export function HabitsWidget({ initial }: { initial: HabitsToday }) {
   }
 
   return (
-    <div className="relative" ref={boxRef}>
+    <div className="relative" ref={boxRef} data-tour="habitos">
       <div className="gradient-border">
         <div className="rounded-[calc(1.5rem-1.5px)] bg-[var(--scard)] p-4">
           <div className="flex items-center gap-2.5">

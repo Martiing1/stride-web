@@ -141,6 +141,10 @@ export interface Member {
   invited_at: string | null;
   activated_at: string | null;
   last_login_at: string | null;
+  /** Cómo quiere aparecer en la comunidad; null = usa full_name. */
+  display_name: string | null;
+  /** Null hasta que termina (o salta) el recorrido de bienvenida. */
+  onboarding_done_at: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getCurrentMember, getCommunityStaff } from "@/lib/member-auth";
 import { todayInChile } from "@/lib/membership";
-import { addPoints, getPointsWeights, notify, MAX_HABITS, DEFAULT_POINTS, type Channel, type PointsWeights } from "@/lib/community";
+import { addPoints, getPointsWeights, notify, MAX_HABITS, DEFAULT_POINTS, memberDisplayName, type Channel, type PointsWeights } from "@/lib/community";
 import { detectImage, detectVideo } from "@/lib/uploads";
 
 /**
@@ -206,7 +206,7 @@ export async function addComment(
     .select("author_member_id")
     .eq("id", postId)
     .maybeSingle();
-  const commenterName = member ? member.full_name.split(" ")[0] : staff!.nickname ?? "STRIDE";
+  const commenterName = member ? memberDisplayName(member).split(" ")[0] : staff!.nickname ?? "STRIDE";
   if (post?.author_member_id && post.author_member_id !== member?.id) {
     await notify(post.author_member_id, {
       title: `${commenterName} comentó tu publicación`,
@@ -1036,5 +1036,30 @@ export async function staffSavePoints(input: Record<string, number>): Promise<Ac
     .upsert({ key: "points", value: clean, updated_at: new Date().toISOString() }, { onConflict: "key" });
   if (error) return err("No pudimos guardar los puntos.");
   revalidatePath("/miembros/ranking");
+  return { ok: true };
+}
+
+// ─── Cuenta ──────────────────────────────────────────────────────────────────
+
+/** Cambia el nombre con el que el miembro aparece en la comunidad. */
+export async function updateDisplayName(name: string): Promise<ActionResult> {
+  const member = await getCurrentMember();
+  if (!member) return err("Tu sesión expiró.");
+  const clean = name.trim().replace(/\s+/g, " ");
+  if (clean.length < 2) return err("Ponle al menos 2 letras.");
+  if (clean.length > 40) return err("Máximo 40 caracteres.");
+  const service = createServiceClient();
+  const { error } = await service.from("members").update({ display_name: clean }).eq("id", member.id);
+  if (error) return err("No pudimos guardar tu nombre.");
+  revalidatePath("/miembros", "layout");
+  return { ok: true };
+}
+
+/** Marca el recorrido de bienvenida como visto (terminado o saltado). */
+export async function completeOnboarding(): Promise<ActionResult> {
+  const member = await getCurrentMember();
+  if (!member) return err("Tu sesión expiró.");
+  const service = createServiceClient();
+  await service.from("members").update({ onboarding_done_at: new Date().toISOString() }).eq("id", member.id);
   return { ok: true };
 }

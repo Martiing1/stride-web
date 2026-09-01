@@ -8,6 +8,8 @@ import { getNotifications } from "@/lib/community";
 import { MemberTabs } from "@/components/community/MemberTabs";
 import { BellButton } from "@/components/community/BellButton";
 import { AdminBar } from "@/components/community/AdminBar";
+import { WelcomeTour } from "@/components/community/WelcomeTour";
+import { memberDisplayName } from "@/lib/community-shared";
 
 export const metadata: Metadata = {
   title: "STRIDE ONE · Comunidad",
@@ -31,7 +33,7 @@ export default async function MemberLayout({ children }: { children: React.React
     member ? getNotifications(member.id) : Promise.resolve({ items: [], unread: 0 }),
   ]);
 
-  const displayName = member?.full_name ?? staff!.nickname ?? staff!.full_name;
+  const displayName = member ? memberDisplayName(member) : staff!.nickname ?? staff!.full_name;
   const initials = displayName
     .split(" ")
     .slice(0, 2)
@@ -88,6 +90,9 @@ export default async function MemberLayout({ children }: { children: React.React
       {staff && <AdminBar name={staff.nickname ?? staff.full_name.split(" ")[0]} />}
 
       <main className="mx-auto w-full max-w-5xl px-4 py-5 pb-24 sm:px-6">{children}</main>
+
+      {/* Recorrido de bienvenida: solo miembros, solo la primera vez. */}
+      {member && !staff && !member.onboarding_done_at && <WelcomeTour firstName={displayName.split(" ")[0]} />}
     </div>
   );
 }

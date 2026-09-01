@@ -1,3 +1,4 @@
+import { memberDisplayName } from "@/lib/community-shared";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import Link from "next/link";
@@ -65,7 +66,7 @@ export default async function PerfilPage() {
             {photoUrl ? (
               <Image
                 src={photoUrl}
-                alt={member.full_name}
+                alt={memberDisplayName(member)}
                 width={80}
                 height={80}
                 unoptimized
@@ -77,7 +78,7 @@ export default async function PerfilPage() {
               </div>
             )}
             <div className="min-w-0">
-              <p className="truncate font-heading text-xl font-bold">{member.full_name}</p>
+              <p className="truncate font-heading text-xl font-bold">{memberDisplayName(member)}</p>
               <p className="mt-1 font-mono text-xs tracking-[0.18em] text-[var(--sdim)]">{member.member_code}</p>
               <p className="mt-1.5 text-xs text-[var(--sdim)]">Miembro desde {formatDateCL(member.joined_at)}</p>
             </div>

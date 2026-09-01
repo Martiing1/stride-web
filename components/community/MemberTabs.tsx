@@ -5,12 +5,12 @@ import { usePathname } from "next/navigation";
 import clsx from "clsx";
 
 const TABS = [
-  { href: "/miembros", label: "Blog" },
-  { href: "/miembros/classroom", label: "Classroom" },
-  { href: "/miembros/calendario", label: "Calendario" },
-  { href: "/miembros/retos", label: "Retos" },
-  { href: "/miembros/ranking", label: "Ranking" },
-  { href: "/miembros/perfil", label: "Perfil" },
+  { href: "/miembros", label: "Blog", tour: "blog" },
+  { href: "/miembros/classroom", label: "Classroom", tour: "classroom" },
+  { href: "/miembros/calendario", label: "Calendario", tour: "calendario" },
+  { href: "/miembros/retos", label: "Retos", tour: "retos" },
+  { href: "/miembros/ranking", label: "Ranking", tour: "ranking" },
+  { href: "/miembros/perfil", label: "Perfil", tour: "perfil" },
 ];
 
 export function MemberTabs() {
@@ -23,6 +23,7 @@ export function MemberTabs() {
           <Link
             key={tab.href}
             href={tab.href}
+            data-tour={tab.tour}
             className={clsx(
               "relative flex-none whitespace-nowrap pb-3 pt-1 font-heading text-sm font-semibold transition-colors",
               active ? "text-[var(--stext)]" : "text-[var(--sdim)] hover:text-[var(--smut)]"
