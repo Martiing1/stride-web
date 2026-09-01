@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import { Check, Eye, EyeOff, LayoutDashboard, Loader2, ShieldCheck, Tags, Users, X } from "lucide-react";
+import { Check, ChevronRight, Eye, EyeOff, LayoutDashboard, Loader2, ShieldCheck, Tags, Users, X } from "lucide-react";
 import { saveBoardLabels, saveDashboardWidgets, saveRoleModules } from "@/app/admin/configuracion/actions";
 import { DASHBOARD_WIDGETS, type ModuleDef, type WidgetId } from "@/lib/app-settings";
 import { ROLE_LABELS } from "@/lib/roles";
@@ -150,7 +150,65 @@ export function RolePermissionsEditor({
   );
 }
 
-/** Vista visual, no navegable, para revisar el ERP sin cambiar de cuenta. */
+const PREVIEW_COPY: Record<string, { description: string; action: string; items: string[] }> = {
+  "/admin": {
+    description: "Prioridades del día, tareas abiertas y los próximos social runs.",
+    action: "Revisar mi día",
+    items: ["Mis tareas abiertas", "Próximo Social Run", "Seguimiento de esta semana"],
+  },
+  "/admin/tareas": {
+    description: "Las tareas de operación que le corresponden al rol y su avance.",
+    action: "Ver mis tareas",
+    items: ["Confirmar ruta del sábado", "Coordinar punto de encuentro", "Actualizar estado"],
+  },
+  "/admin/eventos": {
+    description: "Calendario, estado y operación de los Social Runs.",
+    action: "Ver próximos eventos",
+    items: ["Social Run Parque Ecuador", "Inscripciones", "Equipo en terreno"],
+  },
+  "/admin/planificaciones": {
+    description: "El paso a paso para preparar cada salida del equipo.",
+    action: "Abrir planificación",
+    items: ["Ruta y horarios", "Roles en terreno", "Materiales"],
+  },
+  "/admin/rutas": {
+    description: "Rutas aprobadas, sus distancias y notas de seguridad.",
+    action: "Explorar rutas",
+    items: ["Costanera · 5K", "Parque Ecuador · 7K", "Notas de seguridad"],
+  },
+  "/admin/evaluaciones": {
+    description: "La evaluación posterior a cada salida para mejorar la siguiente.",
+    action: "Completar evaluación",
+    items: ["Asistencia", "Cómo resultó el equipo", "Qué ajustar"],
+  },
+  "/admin/documentos": {
+    description: "Documentos y guías necesarios para operar en terreno.",
+    action: "Abrir documentos",
+    items: ["Manual operativo", "Guía de bienvenida", "Rutas y protocolos"],
+  },
+  "/admin/kits": {
+    description: "Inventario y entregas de los kits del equipo.",
+    action: "Ver inventario",
+    items: ["Kits disponibles", "Entregas pendientes", "Registrar entrega"],
+  },
+  "/admin/membresia": {
+    description: "La planificación mensual disponible para la comunidad.",
+    action: "Ver plan del mes",
+    items: ["Entrenamientos", "Hitos del mes", "Material para miembros"],
+  },
+  "/admin/comunidad": {
+    description: "Publicaciones, actividad y asistencia de la comunidad STRIDE.",
+    action: "Abrir comunidad",
+    items: ["Publicar como STRIDE", "Actividad reciente", "Asistencia"],
+  },
+  "/admin/metricas": {
+    description: "Señales para seguir la participación y el avance de la comunidad.",
+    action: "Revisar métricas",
+    items: ["Asistencia", "Retención", "Participación"],
+  },
+};
+
+/** Demo navegable, sin operaciones reales, para grabar el recorrido de cada rol. */
 function RolePreview({
   role,
   modules,
@@ -166,6 +224,14 @@ function RolePreview({
     (module) => (!module.roles || module.roles.includes(role)) && (module.fixed || !hidden.has(module.href))
   );
   const sections = Array.from(new Set(visible.map((module) => module.section)));
+  const [activeHref, setActiveHref] = useState(visible[0]?.href ?? "/admin");
+  const activeModule = visible.find((module) => module.href === activeHref) ?? visible[0];
+  const copy = PREVIEW_COPY[activeModule?.href ?? ""] ?? {
+    description: `Acceso al módulo ${activeModule?.label ?? "seleccionado"} según la configuración del rol.`,
+    action: `Abrir ${activeModule?.label ?? "módulo"}`,
+    items: ["Vista del módulo", "Información disponible", "Acciones permitidas"],
+  };
+  const nextModule = visible[(visible.findIndex((module) => module.href === activeHref) + 1) % visible.length];
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 p-4 backdrop-blur-sm sm:p-8" role="dialog" aria-modal="true" aria-label={`Vista de ${ROLE_LABELS[role]}`}>
@@ -188,7 +254,14 @@ function RolePreview({
                 <div key={section}>
                   <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-widest text-white/30">{section}</p>
                   {visible.filter((module) => module.section === section).map((module) => (
-                    <div key={module.href} className="rounded-lg px-2 py-1.5 text-sm text-white/65">{module.label}</div>
+                    <button
+                      key={module.href}
+                      type="button"
+                      onClick={() => setActiveHref(module.href)}
+                      className={`block w-full rounded-lg px-2 py-1.5 text-left text-sm transition ${activeModule?.href === module.href ? "bg-stride-accent/15 font-medium text-stride-accent" : "text-white/65 hover:bg-white/5 hover:text-white"}`}
+                    >
+                      {module.label}
+                    </button>
                   ))}
                 </div>
               ))}
@@ -196,20 +269,36 @@ function RolePreview({
           </aside>
 
           <main className="min-w-0 flex-1 p-6 sm:p-9">
-            <p className="text-sm text-white/45">Sistema interno</p>
-            <h4 className="mt-1 font-heading text-3xl font-extrabold text-white">Hola, {ROLE_LABELS[role]}</h4>
-            <p className="mt-2 max-w-xl text-sm leading-relaxed text-white/50">
-              Esta previsualización refleja los módulos visibles con la configuración actual. No cambia
-              tu sesión ni da permisos adicionales.
-            </p>
-            <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {visible.slice(0, 6).map((module) => (
-                <div key={module.href} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                  <p className="text-sm text-white/45">Módulo disponible</p>
-                  <p className="mt-1 font-heading text-lg font-bold text-white">{module.label}</p>
-                </div>
-              ))}
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="text-sm text-white/45">Sistema interno · {ROLE_LABELS[role]}</p>
+                <h4 className="mt-1 font-heading text-3xl font-extrabold text-white">{activeModule?.label}</h4>
+              </div>
+              {nextModule && (
+                <button type="button" onClick={() => setActiveHref(nextModule.href)} className="btn-secondary px-4 py-2 text-sm">
+                  Siguiente módulo <ChevronRight className="h-4 w-4" />
+                </button>
+              )}
             </div>
+            <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/50">{copy.description}</p>
+
+            <div className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="font-heading text-lg font-bold text-white">Demo de {activeModule?.label}</p>
+                <button type="button" className="btn-primary px-4 py-2 text-sm">{copy.action}</button>
+              </div>
+              <ul className="mt-5 space-y-2">
+                {copy.items.map((item, index) => (
+                  <li key={item} className="flex items-center justify-between rounded-xl border border-white/5 bg-black/15 px-4 py-3 text-sm text-white/70">
+                    <span>{item}</span>
+                    <span className={`rounded-full px-2.5 py-1 text-xs ${index === 0 ? "bg-stride-cyan/10 text-stride-cyan" : "bg-white/5 text-white/45"}`}>
+                      {index === 0 ? "Disponible" : "Ver detalle"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <p className="mt-5 text-xs text-white/35">Demo para mostrar y grabar: los botones no alteran información real.</p>
           </main>
         </div>
       </div>
