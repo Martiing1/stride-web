@@ -36,15 +36,18 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   // Todo lo demás del layout va en paralelo: cada navegación del ERP pasa por
   // acá, y encadenar estas consultas era lo que hacía lento cambiar de módulo.
+  // Ninguna de estas consultas puede tumbar el ERP entero: si una falla
+  // (red, Supabase caído), el panel carga con su valor por defecto.
   const [isOwner, pendingEvaluations, config, photoUrl] = await Promise.all([
-    isCurrentUserOwner(),
-    getPendingEvaluations(member.id),
+    isCurrentUserOwner().catch(() => false),
+    getPendingEvaluations(member.id).catch(() => []),
     getAppConfig(),
     member.photo_path
       ? createServiceClient()
           .storage.from("team-photos")
           .createSignedUrl(member.photo_path, 600)
           .then(({ data }) => data?.signedUrl ?? null)
+          .catch(() => null)
       : Promise.resolve(null),
   ]);
 

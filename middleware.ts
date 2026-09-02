@@ -59,9 +59,14 @@ export async function middleware(request: NextRequest) {
   );
 
   // Refresca la sesión. Debe ir antes de cualquier redirect.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Si Supabase no responde, se trata como "sin sesión" en vez de botar el
+  // sitio entero con un 500: el usuario cae al login y puede reintentar.
+  let user: Awaited<ReturnType<typeof supabase.auth.getUser>>["data"]["user"] = null;
+  try {
+    ({ data: { user } } = await supabase.auth.getUser());
+  } catch {
+    user = null;
+  }
 
   // --- Subdominio admin: reescribe / -> /admin ---
   // En desarrollo, las rutas /api/* no se reescriben en el host admin: así el

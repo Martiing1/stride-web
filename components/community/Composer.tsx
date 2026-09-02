@@ -14,7 +14,7 @@ const CHANNELS = [
   { value: "presentacion", label: "Presentación" },
 ] as const;
 
-const MAX_PHOTOS = 4;
+const MAX_PHOTOS = 5;
 
 export interface MentionableChallenge {
   id: string;
@@ -267,7 +267,7 @@ export function Composer({
           </button>
         </div>
         {maxHit && files.length >= MAX_PHOTOS && (
-          <p className="mt-2.5 text-xs font-semibold text-amber-500">Solo hasta 4 fotos por publicación.</p>
+          <p className="mt-2.5 text-xs font-semibold text-amber-500">Solo hasta 5 fotos por publicación.</p>
         )}
         {error && <p className="mt-2 text-xs font-semibold text-red-400">{error}</p>}
       </div>

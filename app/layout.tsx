@@ -1,3 +1,4 @@
+import { GlobalErrorToast } from "@/components/GlobalErrorToast";
 import type { Metadata } from "next";
 import { Inter, Outfit } from "next/font/google";
 import "./globals.css";
@@ -42,7 +43,8 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es-CL" className={`${inter.variable} ${outfit.variable}`}>
-      <body className="font-body antialiased">{children}<PwaRegister /><AuthHashCatcher /></body>
+      <body className="font-body antialiased">{children}
+        <GlobalErrorToast /><PwaRegister /><AuthHashCatcher /></body>
     </html>
   );
 }

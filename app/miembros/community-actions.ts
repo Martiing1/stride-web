@@ -43,7 +43,7 @@ export async function createPost(formData: FormData): Promise<ActionResult> {
   const photoPaths: string[] = [];
 
   const photos = formData.getAll("photos").filter((f): f is File => f instanceof File && f.size > 0);
-  if (photos.length > 4) return err("Máximo 4 fotos por publicación.");
+  if (photos.length > 5) return err("Máximo 5 fotos por publicación.");
   for (const file of photos) {
     if (file.size > 8 * 1024 * 1024) return err("Cada foto debe pesar menos de 8 MB.");
     const bytes = new Uint8Array(await file.arrayBuffer());
