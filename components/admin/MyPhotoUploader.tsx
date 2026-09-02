@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useRef, useState, useTransition } from "react";
 import { Camera, Loader2, UserRound } from "lucide-react";
 import { uploadTeamPhoto } from "@/app/admin/equipo/actions";
+import { compressAvatar } from "@/lib/image-client";
 
 /** Foto de perfil propia: aparece en el menú lateral y en el equipo. */
 export function MyPhotoUploader({ photoUrl, name }: { photoUrl: string | null; name: string }) {
@@ -12,10 +13,11 @@ export function MyPhotoUploader({ photoUrl, name }: { photoUrl: string | null; n
   const [pending, startTransition] = useTransition();
 
   function upload(file: File) {
-    const form = new FormData();
-    form.set("photo", file);
     setError(null);
     startTransition(async () => {
+      const form = new FormData();
+      // Se comprime en el navegador: una foto de celular de 5 MB pasa a ~100 KB.
+      form.set("photo", await compressAvatar(file));
       const result = await uploadTeamPhoto(form);
       if (!result.ok) setError(result.error ?? "No se pudo subir.");
     });

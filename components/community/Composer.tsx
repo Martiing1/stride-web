@@ -1,5 +1,7 @@
 "use client";
 
+import { compressImage } from "@/lib/image-client";
+
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AtSign, Camera, ImagePlus, Target, X } from "lucide-react";
@@ -59,31 +61,7 @@ export function Composer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialChallengeId]);
 
-  const compress = (file: File): Promise<File> =>
-    new Promise((resolve) => {
-      const image = new window.Image();
-      const url = URL.createObjectURL(file);
-      image.onload = () => {
-        URL.revokeObjectURL(url);
-        const scale = Math.min(1, 1600 / Math.max(image.width, image.height));
-        if (scale === 1 && file.size < 900 * 1024) return resolve(file);
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.round(image.width * scale);
-        canvas.height = Math.round(image.height * scale);
-        canvas.getContext("2d")?.drawImage(image, 0, 0, canvas.width, canvas.height);
-        canvas.toBlob(
-          (blob) =>
-            resolve(blob ? new File([blob], file.name.replace(/\.\w+$/, ".jpg"), { type: "image/jpeg" }) : file),
-          "image/jpeg",
-          0.82
-        );
-      };
-      image.onerror = () => {
-        URL.revokeObjectURL(url);
-        resolve(file);
-      };
-      image.src = url;
-    });
+  const compress = (file: File) => compressImage(file, { maxSide: 1600, quality: 0.82 });
 
   const pickFiles = async (list: FileList | null) => {
     if (!list) return;

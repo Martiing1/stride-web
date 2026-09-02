@@ -1,5 +1,7 @@
 "use client";
 
+import { compressImage } from "@/lib/image-client";
+
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, ImagePlus } from "lucide-react";
@@ -24,8 +26,8 @@ export function PhysicalMedalForm() {
     setError(null);
     const formData = new FormData();
     formData.set("title", title);
-    formData.set("photo", file);
     startTransition(async () => {
+      formData.set("photo", await compressImage(file));
       const result = await uploadPhysicalMedal(formData);
       if (!result.ok) return setError(result.error ?? "No pudimos subirla.");
       setOpen(false);

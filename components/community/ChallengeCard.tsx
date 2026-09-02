@@ -1,5 +1,7 @@
 "use client";
 
+import { compressImage } from "@/lib/image-client";
+
 import { useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -54,11 +56,12 @@ export function ChallengeCard({ challenge, highlight }: { challenge: ChallengeVi
     setError(null);
     const formData = new FormData();
     formData.set("challengeId", challenge.id);
-    if (reportFile) formData.set("evidence", reportFile);
+    const evidenceFile = reportFile;
     setState((s) => ({ ...s, count: Math.min(s.count + 1, s.goal) }));
     setReportOpen(false);
     setReportFile(null);
     startTransition(async () => {
+      if (evidenceFile) formData.set("evidence", await compressImage(evidenceFile));
       const result = await reportTraining(formData);
       if (!result.ok) {
         setError(result.error ?? "No pudimos registrar tu avance.");
@@ -79,8 +82,8 @@ export function ChallengeCard({ challenge, highlight }: { challenge: ChallengeVi
     setError(null);
     const formData = new FormData();
     formData.set("challengeId", challenge.id);
-    formData.set("evidence", file);
     startTransition(async () => {
+      formData.set("evidence", await compressImage(file));
       const result = await uploadEvidence(formData);
       if (!result.ok) {
         setError(result.error ?? "No pudimos subir la evidencia.");

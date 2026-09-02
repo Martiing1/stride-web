@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(request: NextRequest) {
   const hostname = request.nextUrl.hostname;
-  if (process.env.NODE_ENV !== "development" || (hostname !== "localhost" && hostname !== "127.0.0.1")) {
+  if (process.env.NODE_ENV !== "development" || (hostname !== "localhost" && hostname !== "127.0.0.1" && !hostname.endsWith(".localhost"))) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
@@ -43,5 +43,6 @@ export async function GET(request: NextRequest) {
   }
 
   const next = request.nextUrl.searchParams.get("next") ?? "/miembros";
-  return NextResponse.redirect(new URL(next, request.nextUrl.origin));
+  const origin = `${request.nextUrl.protocol}//${request.headers.get("host") ?? request.nextUrl.host}`;
+  return NextResponse.redirect(new URL(next, origin));
 }

@@ -64,7 +64,10 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   // --- Subdominio admin: reescribe / -> /admin ---
-  if (isAdminHost && !url.pathname.startsWith("/admin")) {
+  // En desarrollo, las rutas /api/* no se reescriben en el host admin: así el
+  // login de pruebas (/api/dev-login) puede crear sesión en admin.localhost.
+  const isDevApi = process.env.NODE_ENV === "development" && url.pathname.startsWith("/api/");
+  if (isAdminHost && !url.pathname.startsWith("/admin") && !isDevApi) {
     const rewritten = url.clone();
     rewritten.pathname = `/admin${url.pathname === "/" ? "" : url.pathname}`;
 

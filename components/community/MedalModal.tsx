@@ -1,5 +1,7 @@
 "use client";
 
+import { compressImage } from "@/lib/image-client";
+
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, X } from "lucide-react";
@@ -39,8 +41,8 @@ export function MedalGrid({ medals, children }: { medals: VitrinaMedal[]; childr
     const formData = new FormData();
     formData.set("medalId", open.id);
     formData.set("note", note);
-    if (photo) formData.set("photo", photo);
     startTransition(async () => {
+      if (photo) formData.set("photo", await compressImage(photo));
       const result = await saveMedalMemory(formData);
       if (!result.ok) {
         setError(result.error ?? "No pudimos guardar.");

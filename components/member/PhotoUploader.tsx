@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Camera, Loader2 } from "lucide-react";
 import { uploadMemberPhoto } from "@/app/miembros/actions";
+import { compressAvatar } from "@/lib/image-client";
 
 export function PhotoUploader() {
   const input = useRef<HTMLInputElement>(null);
@@ -14,7 +15,8 @@ export function PhotoUploader() {
     setLoading(true);
     setMessage(null);
     const data = new FormData();
-    data.set("photo", file);
+    // Se comprime en el navegador: una foto de celular de 5 MB pasa a ~100 KB.
+    data.set("photo", await compressAvatar(file));
     const result = await uploadMemberPhoto(data);
     setLoading(false);
     setMessage(result.ok ? "Foto actualizada." : result.error ?? "No se pudo actualizar.");
