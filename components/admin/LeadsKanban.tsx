@@ -3,9 +3,9 @@
 import { useState, useTransition, type FormEvent, type DragEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Plus, X, Loader2, MessageCircle, Mail, Trash2, StickyNote, GripVertical,
+  Plus, X, Loader2, MessageCircle, Mail, Trash2, StickyNote, GripVertical, Tag,
 } from "lucide-react";
-import { createLead, moveLead, updateLeadNotes, deleteLead, setLeadTemperature } from "@/app/admin/leads/actions";
+import { createLead, moveLead, updateLeadNotes, deleteLead, setLeadTemperature, setLeadTags } from "@/app/admin/leads/actions";
 import { MOTIVATION_OPTIONS, MOTIVATION_LABELS } from "@/lib/lead-options";
 import type { Lead } from "@/lib/types";
 
@@ -45,6 +45,20 @@ export function LeadsKanban({
   const [dragging, setDragging] = useState<string | null>(null);
   const [overColumn, setOverColumn] = useState<Status | null>(null);
   const [editingNotes, setEditingNotes] = useState<string | null>(null);
+  // La nota y las etiquetas solo se despliegan al abrir la tarjeta (02-09).
+  const [openLead, setOpenLead] = useState<string | null>(null);
+  const [tagDraft, setTagDraft] = useState("");
+
+  function saveTags(id: string, tags: string[]) {
+    const form = new FormData();
+    form.set("id", id);
+    form.set("tags", JSON.stringify(tags));
+    startTransition(async () => {
+      const res = await setLeadTags(form);
+      if (!res.ok) setError(res.error ?? "No se pudieron guardar las etiquetas.");
+      router.refresh();
+    });
+  }
 
   function move(id: string, status: Status) {
     const form = new FormData();
@@ -236,7 +250,17 @@ export function LeadsKanban({
                       <div className="flex items-start gap-2">
                         <GripVertical className="mt-0.5 h-4 w-4 shrink-0 text-white/20" />
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-white">{lead.full_name}</p>
+                          <button type="button" onClick={() => setOpenLead(openLead === lead.id ? null : lead.id)}
+                            className="block w-full truncate text-left text-sm font-medium text-white hover:text-stride-cyan">
+                            {lead.full_name}
+                          </button>
+                          {(lead.tags?.length ?? 0) > 0 && (
+                            <p className="mt-1 flex flex-wrap gap-1">
+                              {lead.tags!.map((t) => (
+                                <span key={t} className="rounded-full bg-stride-indigo/15 px-1.5 py-px text-[10px] font-semibold text-stride-indigo">#{t}</span>
+                              ))}
+                            </p>
+                          )}
                           <p className="mt-0.5 text-xs text-stride-cyan/80">
                             {MOTIVATION_LABELS[lead.motivation] ?? lead.motivation}
                           </p>
@@ -259,11 +283,35 @@ export function LeadsKanban({
                           placeholder="Escribe y haz click fuera para guardar"
                         />
                       ) : (
-                        lead.notes && (
-                          <p className="mt-2 rounded-lg bg-white/5 p-2 text-[11px] leading-snug text-white/55">
+                        openLead === lead.id && lead.notes && (
+                          <p className="mt-2 whitespace-pre-line rounded-lg bg-white/5 p-2 text-[11px] leading-snug text-white/55">
                             {lead.notes}
                           </p>
                         )
+                      )}
+
+                      {openLead === lead.id && (
+                        <div className="mt-2 flex flex-wrap items-center gap-1">
+                          {(lead.tags ?? []).map((t) => (
+                            <button key={t} type="button" title="Quitar etiqueta" disabled={pending}
+                              onClick={() => saveTags(lead.id, (lead.tags ?? []).filter((x) => x !== t))}
+                              className="rounded-full border border-stride-indigo/40 px-2 py-0.5 text-[10px] font-semibold text-stride-indigo hover:bg-red-500/10 hover:text-red-300">
+                              #{t} ×
+                            </button>
+                          ))}
+                          <span className="flex items-center gap-1 rounded-full border border-white/10 px-2 py-0.5">
+                            <Tag className="h-3 w-3 text-white/30" />
+                            <input value={tagDraft} onChange={(e) => setTagDraft(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" && tagDraft.trim()) {
+                                  e.preventDefault();
+                                  saveTags(lead.id, [...(lead.tags ?? []), tagDraft.trim().replace(/^#/, "")]);
+                                  setTagDraft("");
+                                }
+                              }}
+                              placeholder="etiqueta ⏎" className="w-20 bg-transparent text-[10px] text-white outline-none placeholder:text-white/30" />
+                          </span>
+                        </div>
                       )}
 
                       <div className="mt-2.5 flex items-center gap-1 border-t border-white/5 pt-2.5">

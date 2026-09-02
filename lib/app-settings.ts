@@ -33,27 +33,27 @@ export const MODULES: ModuleDef[] = [
   { href: "/admin/eventos", label: "Eventos", section: "Social Run" },
   { href: "/admin/planificaciones", label: "Planificaciones", section: "Social Run" },
   { href: "/admin/rutas", label: "Rutas", section: "Social Run" },
-  { href: "/admin/evaluaciones", label: "Evaluaciones", section: "Social Run", fixed: true },
+  // Evaluaciones ya no es módulo (02-09): es un popup obligatorio tras cada
+  // social run, y sus resultados viven en Métricas.
   { href: "/admin/metricas", label: "Métricas", section: "Social Run", roles: ["socio", "lider_comunidad"] },
   { href: "/admin/membresia", label: "Plan del mes", section: "Membresía", roles: ["socio", "lider_comunidad"] },
-  { href: "/admin/comunidad", label: "Comunidad", section: "Membresía", roles: ["socio", "lider_comunidad"] },
   // Administración del portal de miembros: reservada a socios. Líderes y
   // monitores operan el ERP, pero no publican ni gestionan este portal.
   { href: "https://stridechile.cl/miembros", label: "Vista Miembros ↗", section: "Membresía", roles: ["socio"] },
-  { href: "/admin/miembros", label: "Miembros", section: "Membresía", roles: ["socio", "lider_comunidad"], ownerOnly: true },
+  // Miembros incluye ahora las verificaciones de la comunidad (antes módulo Comunidad).
+  { href: "/admin/miembros", label: "Miembros", section: "Membresía", roles: ["socio"] },
   { href: "/admin/escaneos", label: "Escaneos", section: "Membresía", roles: ["socio", "lider_comunidad"] },
   { href: "/admin/convenios", label: "Convenios", section: "Membresía", roles: ["socio", "lider_comunidad"] },
   { href: "/admin/leads", label: "Leads", section: "Membresía", roles: ["socio", "lider_comunidad"] },
-  { href: "/admin/testimonios", label: "Testimonios", section: "Membresía", roles: ["socio", "lider_comunidad"] },
   { href: "/admin/documentos", label: "Documentos", section: "Recursos" },
   { href: "/admin/kits", label: "Kits e inventario", section: "Recursos" },
   { href: "/admin/finanzas", label: "Finanzas", section: "Recursos", roles: ["socio"] },
-  { href: "/admin/equipo", label: "Equipo", section: "Configuración", roles: ["socio"] },
   { href: "/admin/desempeno", label: "Desempeño", section: "Configuración", roles: ["socio"] },
   { href: "/admin/reglas", label: "Reglas vigentes", section: "Configuración", fixed: true },
   { href: "/admin/incumplimientos", label: "Libro de Incumplimientos", section: "Configuración", fixed: true },
+  // Equipo, Testimonios y Seguridad viven dentro de Configuración (02-09).
+  // /admin/seguridad sigue existiendo para todo el equipo desde el pie del sidebar.
   { href: "/admin/configuracion", label: "Configuración", section: "Configuración", roles: ["socio"] },
-  { href: "/admin/seguridad", label: "Seguridad", section: "Configuración", fixed: true },
 ];
 
 // ─── Widgets del dashboard ───────────────────────────────────────────────────
@@ -108,10 +108,17 @@ export function visibleModules(role: Role, isOwner: boolean, config: AppConfig):
   });
 }
 
+export interface TeamColumn {
+  key: string;
+  label: string;
+}
+
 export interface AppConfig {
   /** hrefs ocultos por rol (solo líder y monitor; socio ve todo su techo). */
   hiddenModules: Partial<Record<Role, string[]>>;
   widgets: WidgetId[];
   leadLabels: Record<string, string>;
   taskLabels: Record<string, string>;
+  /** Columnas extra de la ficha de equipo, configurables (02-09). */
+  teamColumns: TeamColumn[];
 }

@@ -4,10 +4,10 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   Plus, X, Loader2, Map, ExternalLink, Download, Upload,
-  TrafficCone, AlertTriangle, Pencil, Archive, ArchiveRestore,
+  TrafficCone, AlertTriangle, Pencil, Archive, ArchiveRestore, ImagePlus, Trash2,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { createRoute, updateRoute, archiveRoute, setRouteGpx } from "@/app/admin/rutas/actions";
+import { createRoute, updateRoute, archiveRoute, setRouteGpx, setRouteImages } from "@/app/admin/rutas/actions";
 import { GpxPreview } from "@/components/admin/GpxPreview";
 import type { Route } from "@/lib/types";
 
@@ -35,9 +35,21 @@ function RouteFields({ route }: { route?: Route }) {
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="label" htmlFor="distance_km">Distancia (km)</label>
+          <label className="label" htmlFor="distance_km">Distancia total (km)</label>
           <input id="distance_km" name="distance_km" type="number" step="0.1" min="0"
             defaultValue={route?.distance_km ?? ""} className="input" />
+          <p className="label mt-3">Se corre en</p>
+          <div className="flex flex-wrap gap-2">
+            {[3, 5, 10].map((km) => (
+              <label key={km} className="flex cursor-pointer items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs text-white/70">
+                <input type="checkbox" name="distances" value={String(km)}
+                  defaultChecked={(route?.distances_km ?? []).includes(km)} className="h-3.5 w-3.5 accent-[#7C3AED]" />
+                {km}K
+              </label>
+            ))}
+            <input name="distances" placeholder="otra (km)" className="input w-28 py-1.5 text-xs"
+              defaultValue={(route?.distances_km ?? []).filter((d) => ![3, 5, 10].includes(d)).join(", ")} />
+          </div>
         </div>
         <div>
           <label className="label" htmlFor="difficulty">Dificultad</label>
@@ -133,6 +145,34 @@ export function RoutesManager({ routes }: { routes: Route[] }) {
     router.refresh();
   }
 
+  /** Sube fotos al bucket público `rutas` y guarda sus URLs en la ficha. */
+  async function uploadImages(route: Route, files: FileList) {
+    setUploading(`img-${route.id}`);
+    setError(null);
+    const urls = [...(route.image_urls ?? [])];
+    for (const file of Array.from(files).slice(0, 6)) {
+      const path = `${route.id}/img-${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+      const { error: upErr } = await supabase.storage.from("rutas").upload(path, file, { upsert: true });
+      if (upErr) { setError("No se pudo subir una imagen."); continue; }
+      urls.push(supabase.storage.from("rutas").getPublicUrl(path).data.publicUrl);
+    }
+    const form = new FormData();
+    form.set("id", route.id);
+    form.set("image_urls", JSON.stringify(urls));
+    const res = await setRouteImages(form);
+    setUploading(null);
+    if (!res.ok) setError(res.error ?? "No se pudieron guardar las imágenes.");
+    router.refresh();
+  }
+
+  async function removeImage(route: Route, url: string) {
+    const form = new FormData();
+    form.set("id", route.id);
+    form.set("image_urls", JSON.stringify((route.image_urls ?? []).filter((u) => u !== url)));
+    await setRouteImages(form);
+    router.refresh();
+  }
+
   async function toggleArchive(route: Route) {
     const form = new FormData();
     form.set("id", route.id);
@@ -208,9 +248,9 @@ export function RoutesManager({ routes }: { routes: Route[] }) {
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
-                    {route.distance_km && (
-                      <span className="wordmark font-heading text-xl font-extrabold">{route.distance_km}K</span>
-                    )}
+                    {(route.distances_km?.length ? route.distances_km : route.distance_km ? [route.distance_km] : []).map((km) => (
+                      <span key={km} className="wordmark font-heading text-xl font-extrabold">{km}K</span>
+                    ))}
                     {route.difficulty && (
                       <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${DIFFICULTY_TONES[route.difficulty]}`}>
                         {route.difficulty}
@@ -238,6 +278,21 @@ export function RoutesManager({ routes }: { routes: Route[] }) {
 
                 {route.notes && <p className="mt-2 text-xs text-white/50">{route.notes}</p>}
 
+                {(route.image_urls?.length ?? 0) > 0 && (
+                  <div className="mt-3 grid grid-cols-3 gap-2">
+                    {route.image_urls!.map((url) => (
+                      <div key={url} className="group relative aspect-[4/3] overflow-hidden rounded-lg bg-white/5">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={url} alt="" className="h-full w-full object-cover" />
+                        <button type="button" onClick={() => void removeImage(route, url)} aria-label="Quitar imagen"
+                          className="absolute right-1 top-1 hidden rounded-md bg-black/60 p-1 text-white group-hover:block">
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {route.gpx_url && <GpxPreview url={route.gpx_url} />}
 
                 <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-white/5 pt-3">
@@ -261,6 +316,16 @@ export function RoutesManager({ routes }: { routes: Route[] }) {
                         }} />
                     </label>
                   )}
+
+                  <label className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-dashed border-white/15 px-3 py-1.5 text-xs text-white/50 transition hover:border-white/30 hover:text-white">
+                    {uploading === `img-${route.id}` ? (
+                      <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Subiendo…</>
+                    ) : (
+                      <><ImagePlus className="h-3.5 w-3.5" /> Fotos</>
+                    )}
+                    <input type="file" accept="image/*" multiple className="hidden"
+                      onChange={(e) => { if (e.target.files?.length) void uploadImages(route, e.target.files); }} />
+                  </label>
 
                   {route.external_url && (
                     <a href={route.external_url} target="_blank" rel="noopener noreferrer"

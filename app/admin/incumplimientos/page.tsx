@@ -46,6 +46,36 @@ export default async function IncumplimientosPage({
         </p>
       </header>
 
+      {/* Vista admin (02-09): cómo va cada persona, socios incluidos. */}
+      {isSocio && !error && (
+        <section className="card">
+          <h2 className="font-heading text-lg font-bold text-white">Panorama del equipo</h2>
+          <p className="mt-1 text-xs text-white/40">Leves efectivos de los últimos 6 meses por persona. Tres obligan a un Plan de Mejora — y también cuentan para los socios.</p>
+          <ul className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {((team ?? []) as TeamMember[]).map((p) => {
+              const mine = ((rows ?? []) as IncumplimientoRow[]).filter((r) => r.team_member_id === p.id);
+              const sixMonthsAgo = new Date(Date.now() - 183 * 86400000).toISOString().slice(0, 10);
+              const leves = mine.filter((r) => r.classification === "leve_efectivo" && r.occurred_on >= sixMonthsAgo).length;
+              const graves = mine.filter((r) => r.classification === "grave_directo").length;
+              const abiertos = mine.filter((r) => r.status !== "cerrado" && r.status !== "anulado").length;
+              const tone = graves > 0 || leves >= 3 ? "border-red-400/40" : leves > 0 || abiertos > 0 ? "border-amber-400/40" : "border-white/5";
+              return (
+                <li key={p.id} className={`flex items-center justify-between gap-3 rounded-xl border p-3 text-sm ${tone}`}>
+                  <a href={`/admin/incumplimientos?persona=${p.id}`} className="min-w-0">
+                    <p className="truncate font-semibold text-white">{p.nickname ?? p.full_name}</p>
+                    <p className="text-[11px] text-white/40">{p.role === "socio" ? "Socio" : p.role === "lider_comunidad" ? "Líder" : "Monitor"}</p>
+                  </a>
+                  <span className="shrink-0 text-right text-xs text-white/60">
+                    <span className="block font-heading text-lg font-bold text-white">{leves}<span className="text-white/30">/3</span></span>
+                    {graves > 0 ? `${graves} grave` : abiertos > 0 ? `${abiertos} en proceso` : "sin leves"}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
       {error ? (
         <p className="card py-12 text-center text-sm text-white/40">
           Corre la migración 011 para activar el Libro de Incumplimientos.

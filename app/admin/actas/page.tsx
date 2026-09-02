@@ -11,7 +11,7 @@ export default async function ActasPage() {
 
   const { data: meetings } = await supabase
     .from("meetings")
-    .select("id, code, title, meeting_date, attendees")
+    .select("id, code, title, meeting_date, attendees, visibility")
     .order("meeting_date", { ascending: false });
 
   return (
@@ -37,7 +37,10 @@ export default async function ActasPage() {
                 className="card flex items-center justify-between gap-4 transition hover:border-white/20"
               >
                 <div className="min-w-0">
-                  <p className="truncate font-medium text-white">{m.title}</p>
+                  <p className="truncate font-medium text-white">
+                    {m.visibility === "socios" && <span className="mr-2 rounded-full border border-stride-amber/40 bg-stride-amber/10 px-2 py-0.5 text-[11px] font-semibold text-stride-amber">🔒 Solo socios</span>}
+                    {m.title}
+                  </p>
                   <p className="mt-0.5 text-xs text-white/40">
                     {m.meeting_date.split("-").reverse().join("/")}
                     {m.attendees.length > 0 && ` · ${m.attendees.join(", ")}`}

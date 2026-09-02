@@ -85,3 +85,30 @@ export async function saveBoardLabels(formData: FormData): Promise<ConfigResult>
   }
   return result;
 }
+
+const TeamColumnsSchema = z.array(
+  z.object({
+    key: z.string().trim().regex(/^[a-z0-9_]{1,30}$/, "Clave inválida"),
+    label: z.string().trim().min(1).max(40),
+  })
+).max(12);
+
+/** Columnas extra de la ficha de equipo (teléfono, talla, fecha de ingreso, lo que haga falta). */
+export async function saveTeamColumns(formData: FormData): Promise<ConfigResult> {
+  let payload: unknown;
+  try {
+    payload = JSON.parse(String(formData.get("payload") ?? ""));
+  } catch {
+    return { ok: false, error: "Datos inválidos" };
+  }
+  const parsed = TeamColumnsSchema.safeParse(payload);
+  if (!parsed.success) return { ok: false, error: "Revisa las columnas: clave en minúsculas sin espacios y nombre no vacío." };
+  const keys = new Set<string>();
+  for (const c of parsed.data) {
+    if (keys.has(c.key)) return { ok: false, error: `La clave "${c.key}" está repetida.` };
+    keys.add(c.key);
+  }
+  const result = await saveSetting("team_columns", parsed.data);
+  if (result.ok) revalidatePath("/admin/configuracion");
+  return result;
+}

@@ -74,6 +74,7 @@ const ItemSchema = z.object({
   title: z.string().trim().min(3, "Describe el ítem").max(200),
   category: z.string().trim().max(60),
   assignee_id: z.string().uuid().or(z.literal("")),
+  assignee_label: z.string().trim().max(80),
   due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal("")),
   notes: z.string().trim().max(500),
 });
@@ -87,6 +88,7 @@ export async function addItem(formData: FormData): Promise<ChecklistResult> {
     title: formData.get("title"),
     category: formData.get("category") ?? "",
     assignee_id: formData.get("assignee_id") ?? "",
+    assignee_label: formData.get("assignee_label") ?? "",
     due_date: formData.get("due_date") ?? "",
     notes: formData.get("notes") ?? "",
   });
@@ -103,6 +105,7 @@ export async function addItem(formData: FormData): Promise<ChecklistResult> {
     title: d.title,
     category: d.category || null,
     assignee_id: d.assignee_id || null,
+    assignee_label: d.assignee_id ? null : (d.assignee_label || null),
     due_date: d.due_date || null,
     notes: d.notes || null,
     sort_order: 999,
@@ -119,6 +122,7 @@ const EditSchema = z.object({
   title: z.string().trim().min(3).max(200),
   notes: z.string().trim().max(500),
   assignee_id: z.string().uuid().or(z.literal("")),
+  assignee_label: z.string().trim().max(80),
   due_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal("")),
 });
 
@@ -130,6 +134,7 @@ export async function editItem(formData: FormData): Promise<ChecklistResult> {
     title: formData.get("title"),
     notes: formData.get("notes") ?? "",
     assignee_id: formData.get("assignee_id") ?? "",
+    assignee_label: formData.get("assignee_label") ?? "",
     due_date: formData.get("due_date") ?? "",
   });
 
@@ -144,6 +149,7 @@ export async function editItem(formData: FormData): Promise<ChecklistResult> {
       title: d.title,
       notes: d.notes || null,
       assignee_id: d.assignee_id || null,
+      assignee_label: d.assignee_id ? null : (d.assignee_label || null),
       due_date: d.due_date || null,
     })
     .eq("id", d.id);

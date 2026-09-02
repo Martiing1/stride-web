@@ -4,9 +4,10 @@ import { getAppConfig } from "@/lib/app-settings-server";
 import { createServiceClient } from "@/lib/supabase/server";
 import type { SidebarGroup } from "@/components/admin/Sidebar";
 import { getPendingEvaluations } from "@/lib/evaluations";
-import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/admin/Sidebar";
 import { SignOutButton } from "@/components/admin/SignOutButton";
+import { EvaluationGate } from "@/components/admin/EvaluationGate";
+import { THEME_BOOT_SCRIPT } from "@/components/admin/ThemeToggle";
 import { headers } from "next/headers";
 
 export const metadata = {
@@ -47,12 +48,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       : Promise.resolve(null),
   ]);
 
-  // Bloqueo post social run (decisión de Martín, 30-08): con una evaluación
-  // pendiente, TODO el ERP de esa persona queda cerrado salvo el propio
-  // formulario. Individual: cada uno destraba el suyo al entregar la suya.
-  if (pendingEvaluations.length > 0 && !pathname?.startsWith("/admin/evaluaciones")) {
-    redirect(`/admin/evaluaciones/${pendingEvaluations[0].id}`);
-  }
+  // Bloqueo post social run (30-08, ajustado 02-09): con una evaluación
+  // pendiente aparece un popup sobre TODO el ERP que no se puede cerrar hasta
+  // entregarla. Individual: cada uno destraba el suyo al responder.
+  const gate = pendingEvaluations[0] ?? null;
 
   // Módulos visibles: techo del código + lo que la configuración oculta por rol.
   const modules = visibleModules(member.role, isOwner, config);
@@ -67,6 +66,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <div className="flex min-h-dvh flex-col bg-stride-bg lg:flex-row">
+      {/* Aplica el tema guardado antes del primer pintado (evita el destello). */}
+      <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
       <Sidebar
         role={member.role}
         name={member.nickname ?? member.full_name}
@@ -77,6 +78,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <div className="min-w-0 flex-1">
         <div className="mx-auto max-w-6xl px-5 py-8">{children}</div>
       </div>
+      {gate && <EvaluationGate event={gate} pendingCount={pendingEvaluations.length} />}
     </div>
   );
 }

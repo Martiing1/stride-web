@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BadgeCheck, GraduationCap, Upload } from "lucide-react";
+import { BadgeCheck, GraduationCap } from "lucide-react";
 
 /**
  * Barra del staff dentro del área de miembros: identifica la vista de admin
@@ -22,11 +22,8 @@ export function AdminBar({ name }: { name: string }) {
           </span>
         )}
         <span className="ml-auto flex flex-none items-center gap-1.5">
-          <Link href="/admin/comunidad" className="flex items-center gap-1 rounded-full border border-stride-accent/40 px-3 py-1 text-[11px] font-semibold text-stride-accent transition hover:bg-stride-accent hover:text-white">
-            <BadgeCheck className="h-3 w-3" /> Verificaciones
-          </Link>
-          <Link href="/admin/comunidad/asistencia" className="flex items-center gap-1 rounded-full border border-stride-accent/40 px-3 py-1 text-[11px] font-semibold text-stride-accent transition hover:bg-stride-accent hover:text-white">
-            <Upload className="h-3 w-3" /> Asistencia
+          <Link href="/admin/miembros" className="flex items-center gap-1 rounded-full border border-stride-accent/40 px-3 py-1 text-[11px] font-semibold text-stride-accent transition hover:bg-stride-accent hover:text-white">
+            <BadgeCheck className="h-3 w-3" /> Verificaciones y asistencia
           </Link>
           {/* Retos, puntos y eventos se gestionan en sus propias pestañas (Retos / Ranking / Calendario). */}
         </span>

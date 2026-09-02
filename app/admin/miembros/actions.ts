@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireOwner } from "@/lib/auth";
+import { requireOwner, requireTeamMember } from "@/lib/auth";
 import { createAuthApiClient, createClient, createServiceClient } from "@/lib/supabase/server";
 import { generateMemberCode, generateCardToken } from "@/lib/codes";
 import { todayInChile } from "@/lib/membership";
@@ -288,4 +288,45 @@ export async function sendMemberInvitation(formData: FormData): Promise<MemberAc
 function endOfCurrentMonth() {
   const [year, month] = todayInChile().split("-").map(Number);
   return new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
+}
+
+const EditMemberSchema = z.object({
+  id: z.string().uuid(),
+  full_name: z.string().trim().min(2, "Falta el nombre").max(120),
+  email: z.string().trim().email("Email inválido").max(160),
+  whatsapp: z.string().trim().max(30),
+  valid_until: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal("")),
+  notes: z.string().trim().max(2000),
+});
+
+/** Edición de la ficha del miembro (02-09): datos de contacto, vigencia y notas. Solo socios. */
+export async function updateMember(formData: FormData): Promise<MemberActionResult> {
+  await requireTeamMember(["socio"]);
+  const parsed = EditMemberSchema.safeParse({
+    id: formData.get("id"),
+    full_name: formData.get("full_name"),
+    email: formData.get("email"),
+    whatsapp: formData.get("whatsapp") ?? "",
+    valid_until: formData.get("valid_until") ?? "",
+    notes: formData.get("notes") ?? "",
+  });
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  const d = parsed.data;
+
+  const service = createServiceClient();
+  const { error } = await service
+    .from("members")
+    .update({
+      full_name: d.full_name,
+      email: d.email.toLowerCase(),
+      whatsapp: d.whatsapp || null,
+      valid_until: d.valid_until || null,
+      notes: d.notes || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", d.id);
+  if (error) return { ok: false, error: error.message.toLowerCase().includes("email") ? "Ya existe un miembro con ese email." : "No se pudo guardar la ficha." };
+
+  revalidatePath("/admin/miembros");
+  return { ok: true };
 }

@@ -1,5 +1,7 @@
 "use client";
 
+import { RuleEditor } from "@/components/admin/RuleEditor";
+
 import { useMemo, useState } from "react";
 import clsx from "clsx";
 import { ChevronDown, ExternalLink, History, Lock, Search } from "lucide-react";
@@ -163,6 +165,7 @@ export function RulesBook({
                   {isOpen && (
                     <div className="border-t border-white/8 px-4 py-4">
                       <p className="text-sm leading-relaxed text-white/75">{rule.statement}</p>
+                      {isSocio && <RuleEditor rule={rule} />}
 
                       <dl className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-[11px]">
                         <div>

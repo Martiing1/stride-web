@@ -5,6 +5,7 @@ import {
   DEFAULT_TASK_LABELS,
   DEFAULT_WIDGETS,
   type AppConfig,
+  type TeamColumn,
   type WidgetId,
 } from "./app-settings";
 
@@ -31,5 +32,8 @@ export async function getAppConfig(): Promise<AppConfig> {
     widgets: widgets.length ? widgets : DEFAULT_WIDGETS,
     leadLabels: { ...DEFAULT_LEAD_LABELS, ...((map.get("lead_labels") as Record<string, string>) ?? {}) },
     taskLabels: { ...DEFAULT_TASK_LABELS, ...((map.get("task_labels") as Record<string, string>) ?? {}) },
+    teamColumns: Array.isArray(map.get("team_columns"))
+      ? (map.get("team_columns") as TeamColumn[]).filter((c) => c && typeof c.key === "string" && typeof c.label === "string")
+      : [],
   };
 }

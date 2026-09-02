@@ -15,6 +15,8 @@ const uuidOrEmpty = z.string().uuid().or(z.literal(""));
 const PlanSchema = z.object({
   event_id: z.string().uuid(),
   route_id: uuidOrEmpty,
+  // Ruta escrita a mano (02-09): no hace falta ficha en Rutas para planificar.
+  route_text: z.string().trim().max(600),
   meeting_time: z.string().regex(/^\d{2}:\d{2}$/).or(z.literal("")),
   warmup_notes: z.string().trim().max(1000),
   icebreaker: z.string().trim().max(1000),
@@ -43,6 +45,7 @@ export async function savePlan(formData: FormData): Promise<PlanResult> {
   const parsed = PlanSchema.safeParse({
     event_id: formData.get("event_id"),
     route_id: formData.get("route_id") ?? "",
+    route_text: formData.get("route_text") ?? "",
     meeting_time: formData.get("meeting_time") ?? "",
     warmup_notes: formData.get("warmup_notes") ?? "",
     icebreaker: formData.get("icebreaker") ?? "",
@@ -71,6 +74,7 @@ export async function savePlan(formData: FormData): Promise<PlanResult> {
     {
       event_id: d.event_id,
       route_id: nullIfEmpty(d.route_id),
+      route_text: nullIfEmpty(d.route_text),
       meeting_time: nullIfEmpty(d.meeting_time),
       warmup_notes: nullIfEmpty(d.warmup_notes),
       icebreaker: nullIfEmpty(d.icebreaker),
@@ -273,9 +277,16 @@ export async function exportPlanToDrive(formData: FormData): Promise<ExportResul
       .join("")}</table>`;
   };
 
+  // Hora real de salida de cada grupo = hora de encuentro + offset escalonado.
+  const startClock = (offset: number) => {
+    if (!baseTime) return offset === 0 ? "1ª salida" : `+${offset} min`;
+    const [h, m] = baseTime.split(":").map(Number);
+    const total = h * 60 + m + offset;
+    return `${String(Math.floor(total / 60) % 24).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+  };
   const groupsTable = (groups ?? []).length
-    ? `<h2>Desarrollo — grupos y salidas</h2><table border="1"><tr><th>Grupo</th><th>Distancia</th><th>Pace</th><th>Descanso</th><th>Líderes</th><th>Salida</th></tr>${(groups ?? [])
-        .map((g) => `<tr><td>${esc(g.name)}</td><td>${g.distance_km} km</td><td>${paceLabel(g.pace_sec_per_km)}</td><td>${g.break_min} min</td><td>${esc(g.leaders)}</td><td>${g.start_offset_min === 0 ? "1ª salida" : `+${g.start_offset_min} min`}</td></tr>`)
+    ? `<h2>Desarrollo — grupos y salidas</h2><table border="1"><tr><th>Grupo</th><th>Distancia</th><th>Pace</th><th>Descanso</th><th>Líderes</th><th>Hora de salida</th></tr>${(groups ?? [])
+        .map((g) => `<tr><td>${esc(g.name)}</td><td>${g.distance_km} km</td><td>${paceLabel(g.pace_sec_per_km)}</td><td>${g.break_min} min</td><td>${esc(g.leaders)}</td><td>${startClock(g.start_offset_min)}${g.start_offset_min ? ` (+${g.start_offset_min} min)` : ""}</td></tr>`)
         .join("")}</table>`
     : "";
 
@@ -287,7 +298,8 @@ export async function exportPlanToDrive(formData: FormData): Promise<ExportResul
 <h1>STRIDE — Planificación Social Run</h1>
 <table border="1">
 <tr><td><b>Evento</b></td><td>${esc(event.title)}</td><td><b>Fecha</b></td><td>${dateCl}${baseTime ? ` · ${baseTime} hrs` : ""}</td></tr>
-<tr><td><b>Punto de encuentro</b></td><td>${esc(event.meeting_point)}</td><td><b>Ruta</b></td><td>${esc(route?.name)}${route?.distance_km ? ` (${route.distance_km} km)` : ""}</td></tr>
+<tr><td><b>Punto de encuentro</b></td><td>${esc(event.meeting_point)}</td><td><b>Ruta</b></td><td>${esc(route?.name ?? plan.route_text)}${route?.distance_km ? ` (${route.distance_km} km)` : ""}</td></tr>
+<tr><td><b>Hora de encuentro</b></td><td>${baseTime || "—"}</td><td><b>Estado</b></td><td>${esc(plan.status)}</td></tr>
 <tr><td><b>Planificación</b></td><td>${esc(person(plan.planner_id))}</td><td><b>Ruta a cargo de</b></td><td>${esc(person(plan.route_owner_id))}</td></tr>
 <tr><td><b>Lidera</b></td><td>${esc(person(plan.lead_id))}</td><td><b>Cierra / Fotos</b></td><td>${esc(person(plan.sweeper_id))} / ${esc(person(plan.photographer_id))}</td></tr>
 </table>

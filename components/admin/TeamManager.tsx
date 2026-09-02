@@ -5,6 +5,7 @@ import { useRef, useState, useTransition, type FormEvent } from "react";
 import { Camera, Check, Loader2, Mail, Pencil, Plus, Trash2, UserRound, X } from "lucide-react";
 import { createTeamMember, deleteTeamMember, sendTeamInvitation, updateTeamMember, uploadTeamPhoto } from "@/app/admin/equipo/actions";
 import { ROLE_LABELS } from "@/lib/roles";
+import type { TeamColumn } from "@/lib/app-settings";
 import type { TeamMember } from "@/lib/types";
 
 const ROLE_STYLES: Record<string, string> = {
@@ -17,10 +18,13 @@ export function TeamManager({
   team,
   photoUrls,
   currentMemberId,
+  columns = [],
 }: {
   team: TeamMember[];
   photoUrls: Record<string, string>;
   currentMemberId: string;
+  /** Columnas extra definidas en Configuración. */
+  columns?: TeamColumn[];
 }) {
   const [editing, setEditing] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -28,7 +32,7 @@ export function TeamManager({
   return (
     <div className="space-y-6">
       {creating ? (
-        <PersonForm title="Nueva persona" action={createTeamMember} onDone={() => setCreating(false)} onCancel={() => setCreating(false)} />
+        <PersonForm title="Nueva persona" action={createTeamMember} columns={columns} onDone={() => setCreating(false)} onCancel={() => setCreating(false)} />
       ) : (
         <button type="button" onClick={() => setCreating(true)} className="btn-primary">
           <Plus className="h-4 w-4" /> Agregar persona
@@ -43,6 +47,7 @@ export function TeamManager({
               title={`Editar a ${person.nickname ?? person.full_name}`}
               person={person}
               action={updateTeamMember}
+              columns={columns}
               onDone={() => setEditing(null)}
               onCancel={() => setEditing(null)}
             />
@@ -52,6 +57,7 @@ export function TeamManager({
               person={person}
               photoUrl={photoUrls[person.id] ?? null}
               isSelf={person.id === currentMemberId}
+              columns={columns}
               onEdit={() => setEditing(person.id)}
             />
           )
@@ -65,11 +71,13 @@ function PersonRow({
   person,
   photoUrl,
   isSelf,
+  columns = [],
   onEdit,
 }: {
   person: TeamMember;
   photoUrl: string | null;
   isSelf: boolean;
+  columns?: TeamColumn[];
   onEdit: () => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
@@ -151,6 +159,13 @@ function PersonRow({
             )}
             {person.area && ` · ${person.area}`}
           </p>
+          {columns.some((c) => person.extra?.[c.key]) && (
+            <p className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-white/45">
+              {columns.filter((c) => person.extra?.[c.key]).map((c) => (
+                <span key={c.key}><span className="text-white/30">{c.label}:</span> {person.extra?.[c.key]}</span>
+              ))}
+            </p>
+          )}
         </div>
 
         {!person.auth_user_id && (
@@ -194,12 +209,14 @@ function PersonForm({
   title,
   person,
   action,
+  columns = [],
   onDone,
   onCancel,
 }: {
   title: string;
   person?: TeamMember;
   action: (formData: FormData) => Promise<{ ok: boolean; error?: string }>;
+  columns?: TeamColumn[];
   onDone: () => void;
   onCancel: () => void;
 }) {
@@ -256,6 +273,16 @@ function PersonForm({
         </div>
       </div>
 
+      {columns.length > 0 && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {columns.map((c) => (
+            <div key={c.key}>
+              <label htmlFor={`extra-${c.key}`} className="label">{c.label}</label>
+              <input id={`extra-${c.key}`} name={`extra.${c.key}`} defaultValue={person?.extra?.[c.key] ?? ""} className="input" />
+            </div>
+          ))}
+        </div>
+      )}
       {error && <p className="rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-200">{error}</p>}
 
       <div className="flex flex-wrap gap-3">

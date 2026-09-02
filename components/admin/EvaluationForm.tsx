@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import { Check, Loader2 } from "lucide-react";
 import { saveEvaluation } from "@/app/admin/evaluaciones/actions";
 
@@ -12,7 +13,8 @@ const RATINGS: Array<{ name: string; label: string; hint: string }> = [
 ];
 
 /** Evaluación individual post social run. Bloquea el ERP hasta entregarla. */
-export function EvaluationForm({ eventId }: { eventId: string }) {
+export function EvaluationForm({ eventId, embedded = false }: { eventId: string; embedded?: boolean }) {
+  const router = useRouter();
   const [attended, setAttended] = useState<"si" | "no">("si");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -23,13 +25,14 @@ export function EvaluationForm({ eventId }: { eventId: string }) {
     setError(null);
     startTransition(async () => {
       const result = await saveEvaluation(form);
-      // Si todo sale bien la action redirige; llegar acá es un error.
-      if (result && !result.ok) setError(result.error ?? "No se pudo guardar.");
+      if (!result.ok) { setError(result.error ?? "No se pudo guardar."); return; }
+      // El layout vuelve a calcular las pendientes: sin ninguna, el popup desaparece.
+      router.refresh();
     });
   }
 
   return (
-    <form onSubmit={submit} className="card max-w-2xl space-y-6">
+    <form onSubmit={submit} className={embedded ? "space-y-6" : "card max-w-2xl space-y-6"}>
       <input type="hidden" name="event_id" value={eventId} />
 
       <div>

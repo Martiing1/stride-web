@@ -416,7 +416,7 @@ export function TaskBoard({
               </button>
             </div>
 
-            {canCreate ? (
+            {isSocio || openTask.assignee_id === currentMemberId ? (
               <div className="mt-3 space-y-4">
                 <div>
                   <label htmlFor="edit-title" className="label">Tarea</label>

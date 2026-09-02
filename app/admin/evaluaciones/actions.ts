@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireTeamMember } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -66,7 +65,8 @@ export async function saveEvaluation(formData: FormData): Promise<EvaluationResu
   );
   if (error) return { ok: false, error: "No se pudo guardar la evaluación." };
 
-  revalidatePath("/admin/evaluaciones");
-  revalidatePath("/admin");
-  redirect("/admin/evaluaciones?gracias=1");
+  // El popup del layout se cierra solo al refrescar: ya no hay página de evaluaciones.
+  revalidatePath("/admin", "layout");
+  revalidatePath("/admin/metricas");
+  return { ok: true };
 }

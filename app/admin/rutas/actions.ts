@@ -21,6 +21,8 @@ const RouteSchema = z.object({
   safety_notes: z.string().trim().max(1000),
   surface: z.string().trim().max(60),
   notes: z.string().trim().max(1000),
+  // Distancias que se corren en la ruta (3K/5K son las habituales), separadas por coma.
+  distances: z.string().max(60),
 });
 
 function toRow(d: z.infer<typeof RouteSchema>) {
@@ -35,6 +37,10 @@ function toRow(d: z.infer<typeof RouteSchema>) {
     safety_notes: d.safety_notes || null,
     surface: d.surface || null,
     notes: d.notes || null,
+    distances_km: d.distances
+      .split(",")
+      .map((v) => Number(v.trim().replace(",", ".")))
+      .filter((n) => Number.isFinite(n) && n > 0),
   };
 }
 
@@ -50,6 +56,7 @@ function parse(formData: FormData) {
     safety_notes: formData.get("safety_notes") ?? "",
     surface: formData.get("surface") ?? "",
     notes: formData.get("notes") ?? "",
+    distances: formData.getAll("distances").join(","),
   });
 }
 
@@ -135,6 +142,26 @@ export async function setRouteGpx(formData: FormData): Promise<RouteResult> {
 
   if (error) return { ok: false, error: "No se pudo asociar el archivo." };
 
+  revalidatePath("/admin/rutas");
+  return { ok: true };
+}
+
+const ImagesSchema = z.object({
+  id: z.string().uuid(),
+  image_urls: z.array(z.string().url().max(500)).max(12),
+});
+
+/** Reemplaza la lista de fotos de la ruta (las sube el navegador al bucket `rutas`). */
+export async function setRouteImages(formData: FormData): Promise<RouteResult> {
+  await requireTeamMember(["socio", "lider_comunidad"]);
+  let urls: unknown = [];
+  try { urls = JSON.parse(String(formData.get("image_urls") ?? "[]")); } catch { /* vacío */ }
+  const parsed = ImagesSchema.safeParse({ id: formData.get("id"), image_urls: urls });
+  if (!parsed.success) return { ok: false, error: "Imágenes inválidas" };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("routes").update({ image_urls: parsed.data.image_urls }).eq("id", parsed.data.id);
+  if (error) return { ok: false, error: "No se pudieron guardar las imágenes. ¿Corriste la migración 017?" };
   revalidatePath("/admin/rutas");
   return { ok: true };
 }

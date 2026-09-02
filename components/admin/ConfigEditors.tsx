@@ -407,8 +407,8 @@ export function BoardLabelsEditor({
 
 export function ConfigShortcuts() {
   const items = [
-    { href: "/admin/equipo", icon: Users, title: "Equipo", text: "Crear, editar y dar acceso a las personas; roles y fotos." },
-    { href: "/admin/seguridad", icon: ShieldCheck, title: "Seguridad", text: "Tu segundo factor y tu foto de perfil." },
+    { href: "#equipo", icon: Users, title: "Equipo", text: "Crear, editar y dar acceso a las personas; roles, fotos y columnas extra." },
+    { href: "#seguridad", icon: ShieldCheck, title: "Seguridad", text: "Tu segundo factor, tu foto y tu contraseña." },
   ];
   return (
     <div className="grid gap-4 sm:grid-cols-2">

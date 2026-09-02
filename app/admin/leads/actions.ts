@@ -162,3 +162,24 @@ export async function setLeadTemperature(formData: FormData): Promise<LeadAction
   revalidatePath("/admin/leads");
   return { ok: true };
 }
+
+const TagsSchema = z.object({
+  id: z.string().uuid(),
+  tags: z.array(z.string().trim().min(1).max(30)).max(12),
+});
+
+/** Etiquetas libres del lead (además de la temperatura). Se reemplaza la lista completa. */
+export async function setLeadTags(formData: FormData): Promise<LeadActionResult> {
+  await requireTeamMember(["socio", "lider_comunidad"]);
+  let tags: unknown = [];
+  try { tags = JSON.parse(String(formData.get("tags") ?? "[]")); } catch { /* lista vacía */ }
+  const parsed = TagsSchema.safeParse({ id: formData.get("id"), tags });
+  if (!parsed.success) return { ok: false, error: "Etiquetas inválidas" };
+
+  const supabase = await createClient();
+  const unique = Array.from(new Set(parsed.data.tags.map((t) => t.toLowerCase())));
+  const { error } = await supabase.from("leads").update({ tags: unique }).eq("id", parsed.data.id);
+  if (error) return { ok: false, error: "No se pudieron guardar las etiquetas." };
+  revalidatePath("/admin/leads");
+  return { ok: true };
+}

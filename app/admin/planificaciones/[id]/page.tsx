@@ -74,29 +74,28 @@ export default async function PlanificacionPage({
         plan={(planData as EventPlan | null) ?? null}
         routes={(routesData ?? []) as Route[]}
         team={(teamData ?? []) as TeamMember[]}
-      />
-
-      <ExportPlanButton eventId={event.id} />
-
-      <PlanStructureEditor
-        eventId={event.id}
-        meetingTime={(planData as EventPlan | null)?.meeting_time ?? event.event_time}
-        initialBlocks={(blocksRes.data ?? []).map((b: any) => ({
-          section: b.section,
-          block_time: b.block_time?.slice(0, 5) ?? "",
-          leader_label: b.leader_label ?? "",
-          activity: b.activity,
-          notes: b.notes ?? "",
-        }))}
-        initialGroups={(groupsRes.data ?? []).map((g: any) => ({
-          name: g.name,
-          distance_km: Number(g.distance_km),
-          pace_sec_per_km: g.pace_sec_per_km,
-          break_min: g.break_min,
-          leaders: g.leaders ?? "",
-        }))}
-        initialChecklist={(checklistRes.data ?? []).map((c: any) => ({ label: c.label, done: c.done }))}
-      />
+        exportSlot={<ExportPlanButton eventId={event.id} />}
+      >
+        <PlanStructureEditor
+          eventId={event.id}
+          meetingTime={(planData as EventPlan | null)?.meeting_time ?? event.event_time}
+          initialBlocks={(blocksRes.data ?? []).map((b: any) => ({
+            section: b.section,
+            block_time: b.block_time?.slice(0, 5) ?? "",
+            leader_label: b.leader_label ?? "",
+            activity: b.activity,
+            notes: b.notes ?? "",
+          }))}
+          initialGroups={(groupsRes.data ?? []).map((g: any) => ({
+            name: g.name,
+            distance_km: Number(g.distance_km),
+            pace_sec_per_km: g.pace_sec_per_km,
+            break_min: g.break_min,
+            leaders: g.leaders ?? "",
+          }))}
+          initialChecklist={(checklistRes.data ?? []).map((c: any) => ({ label: c.label, done: c.done }))}
+        />
+      </PlanForm>
     </div>
   );
 }

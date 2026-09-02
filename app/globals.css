@@ -265,3 +265,69 @@ body {
     animation: none;
   }
 }
+
+/* ─── ERP · tema claro ──────────────────────────────────────────────────────
+   El admin está escrito con utilidades sobre blanco (text-white/50, etc.).
+   En vez de reescribir cientos de archivos, el tema claro remapea esas
+   utilidades con contraste calibrado (texto principal #171a24 ≈ 14:1). */
+html[data-admin-theme="light"] { --stride-bg: #f3f4f8; --stride-card: #ffffff; }
+html[data-admin-theme="light"] body { background-color: #f3f4f8; color: #171a24; }
+html[data-admin-theme="light"] .bg-stride-bg { background-color: #f3f4f8; }
+html[data-admin-theme="light"] .bg-stride-card { background-color: #ffffff; }
+html[data-admin-theme="light"] .bg-white { background-color: #171a24; color: #fff; }
+html[data-admin-theme="light"] .text-white { color: #171a24; }
+html[data-admin-theme="light"] .text-white\/85 { color: rgba(23,26,36,.9); }
+html[data-admin-theme="light"] .text-white\/80 { color: rgba(23,26,36,.86); }
+html[data-admin-theme="light"] .text-white\/75 { color: rgba(23,26,36,.82); }
+html[data-admin-theme="light"] .text-white\/70 { color: rgba(23,26,36,.78); }
+html[data-admin-theme="light"] .text-white\/65 { color: rgba(23,26,36,.74); }
+html[data-admin-theme="light"] .text-white\/60 { color: rgba(23,26,36,.7); }
+html[data-admin-theme="light"] .text-white\/55 { color: rgba(23,26,36,.66); }
+html[data-admin-theme="light"] .text-white\/50 { color: rgba(23,26,36,.62); }
+html[data-admin-theme="light"] .text-white\/45 { color: rgba(23,26,36,.58); }
+html[data-admin-theme="light"] .text-white\/40 { color: rgba(23,26,36,.54); }
+html[data-admin-theme="light"] .text-white\/35 { color: rgba(23,26,36,.5); }
+html[data-admin-theme="light"] .text-white\/30 { color: rgba(23,26,36,.46); }
+html[data-admin-theme="light"] .text-white\/25 { color: rgba(23,26,36,.42); }
+html[data-admin-theme="light"] .text-white\/20 { color: rgba(23,26,36,.36); }
+html[data-admin-theme="light"] .hover\:text-white:hover { color: #171a24; }
+html[data-admin-theme="light"] .hover\:text-white\/60:hover { color: rgba(23,26,36,.7); }
+html[data-admin-theme="light"] .placeholder\:text-white\/35::placeholder,
+html[data-admin-theme="light"] .placeholder\:text-white\/30::placeholder,
+html[data-admin-theme="light"] .placeholder\:text-white\/25::placeholder { color: rgba(23,26,36,.42); }
+html[data-admin-theme="light"] .bg-white\/\[0\.02\] { background-color: rgba(20,22,40,.025); }
+html[data-admin-theme="light"] .bg-white\/\[0\.03\] { background-color: rgba(20,22,40,.035); }
+html[data-admin-theme="light"] .bg-white\/\[0\.04\] { background-color: rgba(20,22,40,.045); }
+html[data-admin-theme="light"] .bg-white\/5 { background-color: rgba(20,22,40,.05); }
+html[data-admin-theme="light"] .bg-white\/10 { background-color: rgba(20,22,40,.08); }
+html[data-admin-theme="light"] .bg-white\/15 { background-color: rgba(20,22,40,.12); }
+html[data-admin-theme="light"] .hover\:bg-white\/5:hover { background-color: rgba(20,22,40,.05); }
+html[data-admin-theme="light"] .hover\:bg-white\/10:hover { background-color: rgba(20,22,40,.08); }
+html[data-admin-theme="light"] .border-white\/5 { border-color: rgba(20,22,40,.08); }
+html[data-admin-theme="light"] .border-white\/8 { border-color: rgba(20,22,40,.1); }
+html[data-admin-theme="light"] .border-white\/10 { border-color: rgba(20,22,40,.12); }
+html[data-admin-theme="light"] .border-white\/15 { border-color: rgba(20,22,40,.16); }
+html[data-admin-theme="light"] .border-white\/20 { border-color: rgba(20,22,40,.2); }
+html[data-admin-theme="light"] .border-white\/25 { border-color: rgba(20,22,40,.24); }
+html[data-admin-theme="light"] .border-white\/70 { border-color: rgba(20,22,40,.5); }
+html[data-admin-theme="light"] .hover\:border-white\/15:hover { border-color: rgba(20,22,40,.16); }
+html[data-admin-theme="light"] .hover\:border-white\/20:hover { border-color: rgba(20,22,40,.22); }
+html[data-admin-theme="light"] .hover\:border-white\/30:hover { border-color: rgba(20,22,40,.3); }
+html[data-admin-theme="light"] .hover\:border-white\/35:hover { border-color: rgba(20,22,40,.34); }
+html[data-admin-theme="light"] .card { box-shadow: 0 1px 2px rgba(20,22,40,.04), 0 4px 16px rgba(20,22,40,.05); border-color: rgba(20,22,40,.07); }
+html[data-admin-theme="light"] .input { background-color: #fff; border-color: rgba(20,22,40,.16); color: #171a24; }
+html[data-admin-theme="light"] .input:focus { border-color: #7c3aed; }
+html[data-admin-theme="light"] .label { color: rgba(23,26,36,.72); }
+html[data-admin-theme="light"] .btn-secondary { border-color: rgba(20,22,40,.2); color: #171a24; }
+html[data-admin-theme="light"] .btn-secondary:hover { background-color: rgba(20,22,40,.06); }
+html[data-admin-theme="light"] option.bg-stride-card { background-color: #fff; color: #171a24; }
+html[data-admin-theme="light"] select.input, html[data-admin-theme="light"] .input option { color: #171a24; }
+/* Tonos de acento que nacieron para fondo oscuro: se oscurecen un paso. */
+html[data-admin-theme="light"] .text-stride-cyan { color: #0891b2; }
+html[data-admin-theme="light"] .text-stride-cyan\/80 { color: rgba(8,145,178,.85); }
+html[data-admin-theme="light"] .text-emerald-400, html[data-admin-theme="light"] .text-emerald-300 { color: #047857; }
+html[data-admin-theme="light"] .text-amber-400, html[data-admin-theme="light"] .text-amber-300, html[data-admin-theme="light"] .text-amber-200, html[data-admin-theme="light"] .text-stride-amber { color: #b45309; }
+html[data-admin-theme="light"] .text-red-400, html[data-admin-theme="light"] .text-red-300, html[data-admin-theme="light"] .text-red-200 { color: #b91c1c; }
+html[data-admin-theme="light"] .text-cyan-300 { color: #0e7490; }
+html[data-admin-theme="light"] .text-sky-300 { color: #0369a1; }
+html[data-admin-theme="light"] .text-stride-indigo { color: #4f46e5; }

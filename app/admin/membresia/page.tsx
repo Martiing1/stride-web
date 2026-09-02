@@ -40,7 +40,8 @@ export default async function MembresiaPage({
       .eq("month", `${month}-01`)
       .order("sort_order")
       .order("created_at"),
-    supabase.from("team_members").select("*").eq("status", "activo").order("full_name"),
+    // Solo los socios aparecen como responsables (02-09); otros nombres se escriben a mano.
+    supabase.from("team_members").select("*").eq("status", "activo").eq("role", "socio").order("full_name"),
   ]);
 
   return (

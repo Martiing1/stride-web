@@ -56,6 +56,9 @@ export async function saveActa(formData: FormData): Promise<SaveActaResult> {
 
   const { title, meeting_date, attendees, content } = parsed.data;
   const acta = parseActa(content);
+  // Acta reservada a socios: solo un socio puede marcarla, y arrastra a sus tareas.
+  const actaVisibility: "equipo" | "socios" =
+    member.role === "socio" && formData.get("visibility") === "socios" ? "socios" : "equipo";
 
   // Las tareas pueden venir corregidas desde la previsualización (fechas
   // "A definir", responsables, prioridades). Si llegan, mandan ellas.
@@ -96,6 +99,7 @@ export async function saveActa(formData: FormData): Promise<SaveActaResult> {
       content_md: acta.contentWithoutBlock || content,
       raw_block: acta.rawBlock,
       created_by: member.id,
+      visibility: actaVisibility,
     })
     .select("id")
     .single();
@@ -139,7 +143,7 @@ export async function saveActa(formData: FormData): Promise<SaveActaResult> {
         status: "pendiente" as const,
         due_date: task.dueDate,
         meeting_id: meeting.id,
-        visibility: taskVisibility.get(index) ?? "equipo",
+        visibility: actaVisibility === "socios" ? "socios" : (taskVisibility.get(index) ?? "equipo"),
       };
     });
 

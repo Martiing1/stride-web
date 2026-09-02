@@ -338,3 +338,19 @@ export async function setEventlyUrl(formData: FormData) {
   revalidatePath("/");
   return { ok: true };
 }
+
+/** Eliminar un evento: solo socios (02-09). Arrastra planificación, encuesta e inscritos. */
+export async function deleteEvent(formData: FormData): Promise<{ ok: boolean; error?: string }> {
+  await requireTeamMember(["socio"]);
+  const id = z.string().uuid().safeParse(formData.get("id"));
+  if (!id.success) return { ok: false, error: "Evento inválido" };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("events").delete().eq("id", id.data);
+  if (error) return { ok: false, error: "No se pudo eliminar el evento." };
+
+  revalidatePath("/admin/eventos");
+  revalidatePath("/admin/planificaciones");
+  revalidatePath("/admin");
+  return { ok: true };
+}

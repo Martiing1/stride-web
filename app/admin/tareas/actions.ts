@@ -184,7 +184,8 @@ const EditTaskSchema = z.object({
  * cambiar un socio; RLS respalda todo por abajo.
  */
 export async function updateTask(formData: FormData) {
-  const member = await requireTeamMember(["socio", "lider_comunidad"]);
+  // Regla (02-09): cada persona edita SU tarea; solo los socios editan todas.
+  const member = await requireTeamMember();
 
   const parsed = EditTaskSchema.safeParse({
     id: formData.get("id"),
@@ -203,6 +204,10 @@ export async function updateTask(formData: FormData) {
   const supabase = await createClient();
   const { data: before } = await supabase.from("tasks").select("*").eq("id", d.id).maybeSingle();
   if (!before) return { ok: false, error: "La tarea ya no existe (o no la puedes ver)." };
+
+  if (member.role !== "socio" && before.assignee_id !== member.id) {
+    return { ok: false, error: "Solo puedes editar tus propias tareas." };
+  }
 
   // Solo un socio mueve la visibilidad; para el resto se conserva la actual.
   const visibility = member.role === "socio" ? d.visibility : (before.visibility ?? "equipo");

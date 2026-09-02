@@ -10,6 +10,7 @@ import {
   MessageSquareQuote, ClipboardCheck, ShieldCheck, Settings, Menu, X, UserRound, HardDrive, BarChart3, BookLock, Gauge,
 } from "lucide-react";
 import { ROLE_LABELS } from "@/lib/roles";
+import { ThemeToggle } from "@/components/admin/ThemeToggle";
 import type { Role } from "@/lib/types";
 
 // El servidor decide QUÉ módulos van (permisos por rol + configuración);
@@ -126,6 +127,21 @@ export function Sidebar({
       </div>
 
       <div className="border-t border-white/5 pt-4">
+        <ul className="mb-3 space-y-0.5">
+          <li><ThemeToggle expanded={expanded} /></li>
+          <li>
+            <Link
+              href="/admin/seguridad"
+              onClick={() => setOpen(false)}
+              title="Mi acceso y seguridad"
+              aria-current={isActive("/admin/seguridad") ? "page" : undefined}
+              className={`flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm transition ${isActive("/admin/seguridad") ? "bg-stride-accent/15 font-medium text-stride-accent" : "text-white/60 hover:bg-white/5 hover:text-white"}`}
+            >
+              <ShieldCheck className="h-4 w-4 shrink-0" />
+              <span className={`whitespace-nowrap transition-opacity duration-150 ${expanded ? "opacity-100" : "opacity-0"}`}>Mi acceso</span>
+            </Link>
+          </li>
+        </ul>
         <div className="flex items-center gap-3 px-1">
           {photoUrl ? (
             <Image src={photoUrl} alt={name} width={36} height={36} unoptimized className="h-9 w-9 shrink-0 rounded-full border border-white/10 object-cover" />

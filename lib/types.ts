@@ -20,6 +20,8 @@ export interface TeamMember {
   created_at: string;
   /** Foto de perfil en el bucket team-photos (migración 005). */
   photo_path?: string | null;
+  /** Columnas extra configurables desde Configuración (migración 017). */
+  extra?: Record<string, string>;
 }
 
 export interface Meeting {
@@ -32,6 +34,8 @@ export interface Meeting {
   raw_block: string | null;
   created_by: string | null;
   created_at: string;
+  /** 'socios' = acta reservada; el resto del equipo no la ve (migración 017). */
+  visibility?: "equipo" | "socios";
 }
 
 export interface Task {
@@ -209,6 +213,8 @@ export interface Lead {
   status: "nuevo" | "contactado" | "agendado" | "convertido" | "descartado";
   /** Qué tan caliente está el lead (migración 005). */
   temperature?: "frio" | "tibio" | "caliente" | null;
+  /** Etiquetas libres (migración 017). */
+  tags?: string[];
   notes: string | null;
   created_at: string;
 }
@@ -240,12 +246,18 @@ export interface Route {
   active: boolean;
   created_at: string;
   updated_at: string;
+  /** Distancias que se corren en esta ruta, ej. [3, 5] (migración 017). */
+  distances_km?: number[];
+  /** Fotos de la ruta en el bucket público `rutas` (migración 017). */
+  image_urls?: string[];
 }
 
 export interface EventPlan {
   id: string;
   event_id: string;
   route_id: string | null;
+  /** Ruta escrita a mano cuando no hay ficha en Rutas (migración 017). */
+  route_text?: string | null;
   meeting_time: string | null;
   warmup_notes: string | null;
   icebreaker: string | null;
@@ -286,6 +298,8 @@ export interface MonthChecklistItem {
   done_at: string | null;
   done_by: string | null;
   assignee_id: string | null;
+  /** Responsable escrito cuando no es socio (migración 017). */
+  assignee_label?: string | null;
   due_date: string | null;
   sort_order: number;
   created_at: string;

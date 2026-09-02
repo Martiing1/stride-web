@@ -149,8 +149,16 @@ export function PlanStructureEditor({
   const computed = useMemo(() => computeOffsets(groups), [groups]);
   const isEmpty = blocks.length === 0 && groups.length === 0 && checklist.length === 0;
 
+  /**
+   * La plantilla estándar viene con un hora a hora propuesto (02-09), relativo
+   * a la hora de encuentro del evento (10:00 si aún no está definida): el
+   * equipo llega 30 min antes, se sale a correr a los +20 y el social parte a
+   * los +90. Se ajusta después fila por fila.
+   */
   function loadTemplate() {
-    if (blocks.length === 0) setBlocks(TEMPLATE_BLOCKS);
+    const base = meetingTime?.slice(0, 5) || "10:00";
+    const OFFSETS: number[] = [-30, -15, -15, 0, 5, 10, 15, 60, 70, 75, 80, 90, 100, 120, 135];
+    if (blocks.length === 0) setBlocks(TEMPLATE_BLOCKS.map((b, i) => ({ ...b, block_time: addMinutes(base, OFFSETS[i] ?? 0) })));
     if (groups.length === 0) setGroups(TEMPLATE_GROUPS);
     if (checklist.length === 0) setChecklist(TEMPLATE_CHECKLIST.map((label) => ({ label, done: false })));
   }

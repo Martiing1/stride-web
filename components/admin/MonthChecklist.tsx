@@ -94,10 +94,10 @@ export function MonthChecklist({
     router.refresh();
   }
 
-  const nameOf = (id: string | null) => {
-    if (!id) return null;
+  const nameOf = (id: string | null, label?: string | null) => {
+    if (!id) return label ?? null;
     const p = team.find((t) => t.id === id);
-    return p ? (p.nickname ?? p.full_name) : null;
+    return p ? (p.nickname ?? p.full_name) : (label ?? null);
   };
 
   if (items.length === 0) {
@@ -174,11 +174,12 @@ export function MonthChecklist({
             <div>
               <label className="label" htmlFor="assignee_id">Responsable</label>
               <select id="assignee_id" name="assignee_id" defaultValue="" className="input">
-                <option value="" className="bg-stride-card">Sin asignar</option>
+                <option value="" className="bg-stride-card">Otra persona (escríbela abajo)</option>
                 {team.map((t) => (
                   <option key={t.id} value={t.id} className="bg-stride-card">{t.nickname ?? t.full_name}</option>
                 ))}
               </select>
+              <input name="assignee_label" className="input mt-2 py-2 text-sm" placeholder="Nombre de otra persona" />
             </div>
             <div>
               <label className="label" htmlFor="due_date">Fecha límite</label>
@@ -200,7 +201,7 @@ export function MonthChecklist({
       <ul className="space-y-2">
         {items.map((item) => {
           const overdue = !item.done && item.due_date && item.due_date < today;
-          const assignee = nameOf(item.assignee_id);
+          const assignee = nameOf(item.assignee_id, item.assignee_label);
 
           if (editing === item.id) {
             return (
@@ -209,12 +210,15 @@ export function MonthChecklist({
                   <input name="title" defaultValue={item.title} required className="input" />
                   <input name="notes" defaultValue={item.notes ?? ""} className="input" placeholder="Nota" />
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <select name="assignee_id" defaultValue={item.assignee_id ?? ""} className="input">
-                      <option value="" className="bg-stride-card">Sin asignar</option>
-                      {team.map((t) => (
-                        <option key={t.id} value={t.id} className="bg-stride-card">{t.nickname ?? t.full_name}</option>
-                      ))}
-                    </select>
+                    <div className="space-y-2">
+                      <select name="assignee_id" defaultValue={item.assignee_id ?? ""} className="input">
+                        <option value="" className="bg-stride-card">Otra persona (escríbela abajo)</option>
+                        {team.map((t) => (
+                          <option key={t.id} value={t.id} className="bg-stride-card">{t.nickname ?? t.full_name}</option>
+                        ))}
+                      </select>
+                      <input name="assignee_label" defaultValue={item.assignee_label ?? ""} className="input py-2 text-sm" placeholder="Nombre de otra persona" />
+                    </div>
                     <input name="due_date" type="date" defaultValue={item.due_date ?? ""} className="input" />
                   </div>
                   <div className="flex gap-2">

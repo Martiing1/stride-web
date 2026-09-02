@@ -32,7 +32,19 @@ function parse(formData: FormData) {
   });
 }
 
-function toRow(d: z.infer<typeof PersonSchema>) {
+/** Columnas extra configurables: llegan como extra.<clave>=valor. */
+function extraFrom(formData: FormData): Record<string, string> {
+  const extra: Record<string, string> = {};
+  for (const [k, v] of formData.entries()) {
+    if (k.startsWith("extra.") && typeof v === "string") {
+      const key = k.slice(6).trim();
+      if (/^[a-z0-9_]{1,30}$/.test(key)) extra[key] = v.trim().slice(0, 200);
+    }
+  }
+  return extra;
+}
+
+function toRow(d: z.infer<typeof PersonSchema>, extra?: Record<string, string>) {
   return {
     full_name: d.full_name,
     nickname: d.nickname || null,
@@ -40,6 +52,7 @@ function toRow(d: z.infer<typeof PersonSchema>) {
     role: d.role,
     area: d.area || null,
     status: d.status,
+    ...(extra ? { extra } : {}),
   };
 }
 
@@ -49,10 +62,10 @@ export async function createTeamMember(formData: FormData): Promise<TeamResult> 
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
 
   const supabase = await createClient();
-  const { error } = await supabase.from("team_members").insert(toRow(parsed.data));
+  const { error } = await supabase.from("team_members").insert(toRow(parsed.data, extraFrom(formData)));
   if (error) return { ok: false, error: "No se pudo crear. ¿El email ya existe?" };
 
-  revalidatePath("/admin/equipo");
+  revalidatePath("/admin/configuracion");
   return { ok: true };
 }
 
@@ -70,10 +83,10 @@ export async function updateTeamMember(formData: FormData): Promise<TeamResult> 
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.from("team_members").update(toRow(parsed.data)).eq("id", id.data);
+  const { error } = await supabase.from("team_members").update(toRow(parsed.data, extraFrom(formData))).eq("id", id.data);
   if (error) return { ok: false, error: "No se pudo guardar. ¿El email ya existe?" };
 
-  revalidatePath("/admin/equipo");
+  revalidatePath("/admin/configuracion");
   revalidatePath("/admin", "layout");
   return { ok: true };
 }
@@ -101,7 +114,7 @@ export async function deleteTeamMember(formData: FormData): Promise<TeamResult> 
   const { error } = await supabase.from("team_members").delete().eq("id", id.data);
   if (error) return { ok: false, error: "No se pudo eliminar: tiene historial asociado. Márcala como inactiva." };
 
-  revalidatePath("/admin/equipo");
+  revalidatePath("/admin/configuracion");
   return { ok: true };
 }
 
@@ -169,7 +182,7 @@ export async function sendTeamInvitation(formData: FormData): Promise<TeamResult
     .eq("id", person.id);
   if (linkError) return { ok: false, error: "Se envió el correo, pero no pudimos enlazar la cuenta. Intenta nuevamente." };
 
-  revalidatePath("/admin/equipo");
+  revalidatePath("/admin/configuracion");
   revalidatePath("/admin", "layout");
   return { ok: true };
 }
@@ -225,7 +238,7 @@ export async function uploadTeamPhoto(formData: FormData): Promise<TeamResult> {
   }
   if (target.photo_path) await service.storage.from("team-photos").remove([target.photo_path]);
 
-  revalidatePath("/admin/equipo");
+  revalidatePath("/admin/configuracion");
   revalidatePath("/admin", "layout");
   return { ok: true };
 }

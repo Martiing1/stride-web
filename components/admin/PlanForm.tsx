@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, CheckCircle2, Snowflake, Users, Package, CloudRain, Coffee } from "lucide-react";
 import { savePlan } from "@/app/admin/planificaciones/actions";
@@ -10,23 +10,29 @@ import type { EventPlan, Route, TeamMember } from "@/lib/types";
  * Planificación estructurada de un Social Run.
  *
  * Los campos siguen el orden real del evento (antes → durante → después) para
- * que llenarlo se parezca a recorrerlo mentalmente.
+ * que llenarlo se parezca a recorrerlo mentalmente. El itinerario (`children`)
+ * va en medio, y el estado + guardar + exportar quedan siempre al final.
  */
 export function PlanForm({
   eventId,
   plan,
   routes,
   team,
+  children,
+  exportSlot,
 }: {
   eventId: string;
   plan: EventPlan | null;
   routes: Route[];
   team: TeamMember[];
+  children?: ReactNode;
+  exportSlot?: ReactNode;
 }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [routeId, setRouteId] = useState(plan?.route_id ?? "");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -68,23 +74,31 @@ export function PlanForm({
         <h2 className="font-heading text-lg font-bold text-white">Ruta y horario</h2>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="label" htmlFor="route_id">Ruta</label>
-            <select id="route_id" name="route_id" defaultValue={plan?.route_id ?? ""} className="input">
-              <option value="" className="bg-stride-card">Sin definir</option>
+            <label className="label" htmlFor="route_id">Ruta guardada</label>
+            <select id="route_id" name="route_id" value={routeId} onChange={(e) => setRouteId(e.target.value)} className="input">
+              <option value="" className="bg-stride-card">Sin ruta guardada (escríbela abajo)</option>
               {routes.map((r) => (
                 <option key={r.id} value={r.id} className="bg-stride-card">
                   {r.name}{r.distance_km ? ` · ${r.distance_km}K` : ""}
                 </option>
               ))}
             </select>
-            <p className="mt-1 text-xs text-white/35">
-              Si no está, créala primero en Rutas.
-            </p>
           </div>
           <div>
             <label className="label" htmlFor="meeting_time">Hora de encuentro</label>
             <input id="meeting_time" name="meeting_time" type="time"
               defaultValue={plan?.meeting_time?.slice(0, 5) ?? ""} className="input" />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="label" htmlFor="route_text">
+              {routeId ? "Notas de la ruta para este evento" : "Ruta escrita"}
+            </label>
+            <textarea id="route_text" name="route_text" rows={2} defaultValue={plan?.route_text ?? ""}
+              className="input resize-y"
+              placeholder="Parque Ecuador → Costanera → vuelta por Chacabuco. 3K corta en el puente; 5K sigue hasta el muelle." />
+            <p className="mt-1 text-xs text-white/35">
+              No necesitas una ficha en Rutas para planificar: describe el recorrido acá y listo.
+            </p>
           </div>
         </div>
       </section>
@@ -130,7 +144,7 @@ export function PlanForm({
         <div>
           <label className="label" htmlFor="groups_notes">Grupos de ritmo</label>
           <textarea id="groups_notes" name="groups_notes" rows={2} defaultValue={plan?.groups_notes ?? ""}
-            className="input resize-y" placeholder="3K / 5K / 10K, quién lidera cada grupo, qué hacen los que llegan primero" />
+            className="input resize-y" placeholder="3K / 5K, quién lidera cada grupo, qué hacen los que llegan primero" />
         </div>
 
         <div>
@@ -170,7 +184,10 @@ export function PlanForm({
         </div>
       </section>
 
-      {/* Estado y guardar */}
+      {/* Itinerario del día (hora a hora, grupos, checklist) */}
+      {children}
+
+      {/* Estado, guardar y exportar: siempre al final */}
       <div className="card flex flex-wrap items-end justify-between gap-4">
         <div>
           <label className="label" htmlFor="status">Estado</label>
@@ -181,7 +198,7 @@ export function PlanForm({
           </select>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {saved && (
             <span className="flex items-center gap-1.5 text-sm text-emerald-400">
               <CheckCircle2 className="h-4 w-4" /> Guardado
@@ -190,6 +207,7 @@ export function PlanForm({
           <button type="submit" disabled={saving} className="btn-primary">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Guardar planificación"}
           </button>
+          {exportSlot}
         </div>
       </div>
 

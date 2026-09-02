@@ -1,4 +1,4 @@
-import { BarChart3, CalendarDays, Percent, Users } from "lucide-react";
+import { BarChart3, CalendarDays, Percent, Users, Star, IdCard, ScanLine, UserPlus } from "lucide-react";
 import { requireTeamMember } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { formatDateCL } from "@/lib/membership";
@@ -20,13 +20,28 @@ interface Reg {
   validated_at: string | null;
 }
 
+interface EvalRow {
+  event_id: string;
+  attended: boolean;
+  rating_overall: number | null;
+  rating_team: number | null;
+  rating_safety: number | null;
+  rating_timing: number | null;
+  improvements: string | null;
+  highlights: string | null;
+}
+
+const avg = (values: number[]) =>
+  values.length ? (values.reduce((a, b) => a + b, 0) / values.length).toFixed(1) : "—";
+
 const MONTHS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
 export default async function MetricasPage() {
   await requireTeamMember(["socio", "lider_comunidad"]);
   const supabase = await createClient();
 
-  const [{ data: eventsData }, { data: regsData }] = await Promise.all([
+  const monthStart = `${new Date().toISOString().slice(0, 7)}-01`;
+  const [{ data: eventsData }, { data: regsData }, { data: evalsData }, { data: membersData }, { count: scansMonth }, { data: leadsData }] = await Promise.all([
     supabase
       .from("events")
       .select("*")
@@ -34,9 +49,31 @@ export default async function MetricasPage() {
       .in("status", ["confirmado", "completado"])
       .order("event_date"),
     supabase.from("event_registrations").select("event_id, email, first_name, last_name, validated_at"),
+    supabase.from("event_evaluations").select("event_id, attended, rating_overall, rating_team, rating_safety, rating_timing, improvements, highlights"),
+    supabase.from("members").select("status, valid_until, joined_at, invitation_status"),
+    supabase.from("scans").select("id", { count: "exact", head: true }).gte("scanned_at", `${monthStart}T00:00:00`),
+    supabase.from("leads").select("status, created_at"),
   ]);
   const events = (eventsData ?? []) as StrideEvent[];
   const regs = (regsData ?? []) as Reg[];
+  const evals = (evalsData ?? []) as EvalRow[];
+  const evalsByEvent = new Map<string, EvalRow[]>();
+  for (const e of evals) evalsByEvent.set(e.event_id, [...(evalsByEvent.get(e.event_id) ?? []), e]);
+  const evalAvg = (eventId: string) => {
+    const vals = (evalsByEvent.get(eventId) ?? []).filter((e) => e.attended).map((e) => e.rating_overall).filter((v): v is number => v != null);
+    return vals.length ? avg(vals) : null;
+  };
+
+  // ── Membresía ──
+  const today = new Date().toISOString().slice(0, 10);
+  const members = (membersData ?? []) as Array<{ status: string; valid_until: string | null; joined_at: string; invitation_status: string }>;
+  const activos = members.filter((m) => m.status === "activa" && (!m.valid_until || m.valid_until >= today)).length;
+  const nuevosMes = members.filter((m) => m.joined_at >= monthStart).length;
+  const activados = members.filter((m) => m.invitation_status === "activada").length;
+  const leads = (leadsData ?? []) as Array<{ status: string; created_at: string }>;
+  const leadsMes = leads.filter((l) => l.created_at >= monthStart).length;
+  const convertidos = leads.filter((l) => l.status === "convertido").length;
+  const conversion = leads.length ? Math.round((convertidos / leads.length) * 100) : null;
 
   const byEvent = new Map<string, Reg[]>();
   for (const r of regs) byEvent.set(r.event_id, [...(byEvent.get(r.event_id) ?? []), r]);
@@ -47,7 +84,7 @@ export default async function MetricasPage() {
       const attended = list.filter((r) => r.validated_at).length;
       return { event, registered: list.length, attended, rate: list.length ? attended / list.length : null };
     })
-    .filter((r) => r.registered > 0 || r.event.status === "completado");
+    .filter((r) => r.registered > 0 || r.event.status === "completado" || evalsByEvent.has(r.event.id));
 
   // Agregado mes a mes
   const monthly = new Map<string, { registered: number; attended: number; events: number }>();
@@ -88,8 +125,8 @@ export default async function MetricasPage() {
         </p>
         <h1 className="mt-2 font-heading text-3xl font-extrabold tracking-tight">Social Runs en números</h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/50">
-          Inscritos contra asistencia real (validación en puerta de Evently). Importa el .xlsx
-          de cada evento para alimentar esto.
+          Membresía, inscritos contra asistencia real (validación en puerta de Evently) y las
+          evaluaciones del equipo. Importa el .xlsx de cada evento para alimentar esto.
         </p>
       </header>
 
@@ -106,6 +143,33 @@ export default async function MetricasPage() {
             <p className="mt-1 text-sm text-white/45">{label}</p>
           </div>
         ))}
+      </section>
+
+      {/* Membresía */}
+      <section className="card space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="flex items-center gap-2 font-heading text-lg font-bold text-white"><IdCard className="h-5 w-5 text-stride-cyan" /> Membresía</h2>
+          <span className="text-xs text-white/40">Este mes desde el {monthStart.split("-").reverse().join("/")}</span>
+        </div>
+        <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          {[
+            ["Miembros vigentes", String(activos), IdCard],
+            ["Nuevos este mes", String(nuevosMes), UserPlus],
+            ["Ya entraron a la plataforma", `${activados}/${members.length}`, Users],
+            ["Escaneos QR del mes", String(scansMonth ?? 0), ScanLine],
+            ["Leads del mes", String(leadsMes), UserPlus],
+            ["Conversión leads → miembro", conversion != null ? `${conversion}%` : "—", Percent],
+          ].map(([label, value, Icon]) => {
+            const I = Icon as typeof IdCard;
+            return (
+              <div key={label as string} className="rounded-xl bg-white/[0.03] p-3">
+                <I className="h-4 w-4 text-white/30" />
+                <dd className="mt-2 font-heading text-2xl font-extrabold text-white">{value as string}</dd>
+                <dt className="mt-0.5 text-[11px] text-white/45">{label as string}</dt>
+              </div>
+            );
+          })}
+        </dl>
       </section>
 
       {/* Mes a mes */}
@@ -161,7 +225,8 @@ export default async function MetricasPage() {
                     <th className="pb-2 pr-3 font-medium">Evento</th>
                     <th className="pb-2 pr-3 text-right font-medium">Inscritos</th>
                     <th className="pb-2 pr-3 text-right font-medium">Fueron</th>
-                    <th className="pb-2 text-right font-medium">Tasa</th>
+                    <th className="pb-2 pr-3 text-right font-medium">Tasa</th>
+                    <th className="pb-2 text-right font-medium">Evaluación</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -173,7 +238,8 @@ export default async function MetricasPage() {
                       </td>
                       <td className="py-2.5 pr-3 text-right text-white/70">{registered || "—"}</td>
                       <td className="py-2.5 pr-3 text-right text-white/70">{attended || "—"}</td>
-                      <td className="py-2.5 text-right font-semibold text-white">{rate != null ? `${Math.round(rate * 100)}%` : "—"}</td>
+                      <td className="py-2.5 pr-3 text-right font-semibold text-white">{rate != null ? `${Math.round(rate * 100)}%` : "—"}</td>
+                      <td className="py-2.5 text-right text-white/70">{evalAvg(event.id) ? <span className="inline-flex items-center gap-1"><Star className="h-3 w-3 text-stride-amber" />{evalAvg(event.id)}</span> : "—"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -202,6 +268,48 @@ export default async function MetricasPage() {
           )}
         </section>
       </div>
+
+      {/* Evaluaciones del equipo (antes módulo aparte) */}
+      <section className="card space-y-4">
+        <h2 className="flex items-center gap-2 font-heading text-lg font-bold text-white"><Star className="h-5 w-5 text-stride-amber" /> Evaluaciones del equipo</h2>
+        {evals.length === 0 ? (
+          <p className="py-4 text-sm text-white/40">Cuando el equipo evalúe el próximo social run, acá aparece el promedio por evento y lo que dijeron.</p>
+        ) : (
+          <div className="space-y-3">
+            {[...events].reverse().filter((e) => evalsByEvent.has(e.id)).slice(0, 8).map((event) => {
+              const rows = (evalsByEvent.get(event.id) ?? []);
+              const att = rows.filter((r) => r.attended);
+              const notes = rows.flatMap((r) => [r.improvements, r.highlights]).filter((v): v is string => Boolean(v));
+              return (
+                <article key={event.id} className="rounded-xl border border-white/5 p-4">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <a href={`/admin/eventos/${event.id}`} className="font-heading font-bold text-white hover:text-stride-cyan">{event.title}</a>
+                    <span className="text-xs text-white/40">{formatDateCL(event.event_date)} · {rows.length} {rows.length === 1 ? "respuesta" : "respuestas"}</span>
+                  </div>
+                  <dl className="mt-3 grid grid-cols-4 gap-2 text-center">
+                    {[
+                      ["General", att.map((r) => r.rating_overall)],
+                      ["Equipo", att.map((r) => r.rating_team)],
+                      ["Seguridad", att.map((r) => r.rating_safety)],
+                      ["Tiempos", att.map((r) => r.rating_timing)],
+                    ].map(([label, vals]) => (
+                      <div key={label as string} className="rounded-lg bg-white/[0.03] p-2">
+                        <dt className="text-[10px] uppercase tracking-wide text-white/35">{label as string}</dt>
+                        <dd className="font-heading text-lg font-bold text-white">{avg((vals as Array<number | null>).filter((v): v is number => v != null))}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                  {notes.length > 0 && (
+                    <ul className="mt-3 space-y-1 border-t border-white/5 pt-3">
+                      {notes.slice(0, 4).map((n, i) => <li key={i} className="text-xs leading-relaxed text-white/55">· {n}</li>)}
+                    </ul>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
