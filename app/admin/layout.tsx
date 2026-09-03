@@ -1,3 +1,4 @@
+import { getCurrentMember, getSignedMemberPhoto } from "@/lib/member-auth";
 import { requireTeamMember, isCurrentUserOwner } from "@/lib/auth";
 import { visibleModules } from "@/lib/app-settings";
 import { getAppConfig } from "@/lib/app-settings-server";
@@ -42,13 +43,17 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     isCurrentUserOwner().catch(() => false),
     getPendingEvaluations(member.id).catch(() => []),
     getAppConfig(),
+    // La foto del ERP vive en team-photos; si esta persona no tiene una pero sí
+    // subió la suya como miembro, se reutiliza esa (misma cara en los dos lados).
     member.photo_path
       ? createServiceClient()
           .storage.from("team-photos")
           .createSignedUrl(member.photo_path, 600)
           .then(({ data }) => data?.signedUrl ?? null)
           .catch(() => null)
-      : Promise.resolve(null),
+      : getCurrentMember()
+          .then((m) => (m ? getSignedMemberPhoto(m) : null))
+          .catch(() => null),
   ]);
 
   // Bloqueo post social run (30-08, ajustado 02-09): con una evaluación

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { CalendarDays, Flame, Trophy } from "lucide-react";
-import { getCurrentMember, getCommunityStaff } from "@/lib/member-auth";
+import { getCurrentMember, getCommunityStaff, getSignedMemberPhoto, getSignedStaffPhoto } from "@/lib/member-auth";
 import {
   getChallenges,
   getFeed,
@@ -59,6 +59,11 @@ export default async function BlogPage({
     .join("")
     .toUpperCase();
 
+  // Misma foto que muestra el encabezado: la del ERP si es del equipo.
+  const photoUrl = member
+    ? (await getSignedMemberPhoto(member)) ?? (await getSignedStaffPhoto(staff?.photo_path))
+    : await getSignedStaffPhoto(staff?.photo_path);
+
   const upcoming = events.slice(0, 3);
   const top3 = ranking.rows.slice(0, 3);
   const myPos = ranking.rows.findIndex((row) => row.is_me) + 1;
@@ -68,7 +73,7 @@ export default async function BlogPage({
       <div className="space-y-4">
         {staff && <StaffComposer />}
         {habits && <HabitsWidget initial={habits} />}
-        {member && <Composer initials={initials} challenges={mentionables} initialChallengeId={reto ?? null} />}
+        {member && <Composer initials={initials} photoUrl={photoUrl} challenges={mentionables} initialChallengeId={reto ?? null} />}
         {query && (
           <p className="text-xs text-[var(--smut)]">
             Resultados para «{q}» ·{" "}

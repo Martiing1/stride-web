@@ -88,13 +88,25 @@ export const getCommunityStaff = cache(async () => {
   const service = createServiceClient();
   const { data } = await service
     .from("team_members")
-    .select("id, full_name, nickname, role")
+    .select("id, full_name, nickname, role, photo_path")
     .eq("auth_user_id", user.id)
     .eq("status", "activo")
     .eq("role", "socio")
     .maybeSingle();
-  return (data as { id: string; full_name: string; nickname: string | null; role: string } | null) ?? null;
+  return (data as { id: string; full_name: string; nickname: string | null; role: string; photo_path: string | null } | null) ?? null;
 });
+
+/**
+ * Foto de perfil de alguien del equipo. Vive en `team-photos` (la sube el ERP),
+ * no en `member-photos`: sin esto, el staff entraba al área de miembros con las
+ * iniciales aunque tuviera foto puesta en el ERP.
+ */
+export async function getSignedStaffPhoto(photoPath: string | null | undefined) {
+  if (!photoPath) return null;
+  const service = createServiceClient();
+  const { data } = await service.storage.from("team-photos").createSignedUrl(photoPath, 300);
+  return data?.signedUrl ?? null;
+}
 
 export async function getSignedMemberPhoto(member: Pick<Member, "photo_path" | "photo_url">) {
   if (member.photo_path) {

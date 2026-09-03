@@ -29,10 +29,13 @@ export interface MentionableChallenge {
  */
 export function Composer({
   initials,
+  photoUrl,
   challenges = [],
   initialChallengeId = null,
 }: {
   initials: string;
+  /** Foto de perfil ya firmada; si no hay, se muestran las iniciales. */
+  photoUrl?: string | null;
   challenges?: MentionableChallenge[];
   initialChallengeId?: string | null;
 }) {
@@ -110,8 +113,13 @@ export function Composer({
           onClick={() => setOpen(true)}
           className="flex w-full items-center gap-3 rounded-full border border-[var(--sline)] bg-[var(--scard)] px-3 py-2.5 text-left transition hover:border-[var(--sline2)]"
         >
-          <span className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-gradient-to-br from-stride-cyan/25 to-stride-accent/40 font-heading text-[11px] font-bold text-white">
-            {initials}
+          <span className="flex h-8 w-8 flex-none items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-stride-cyan/25 to-stride-accent/40 font-heading text-[11px] font-bold text-white">
+            {photoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={photoUrl} alt="" className="h-full w-full object-cover" />
+            ) : (
+              initials
+            )}
           </span>
           <span className="flex-1 text-sm text-[var(--sdim)]">Escribe algo…</span>
           <span className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-[var(--shover)] text-stride-accent">
