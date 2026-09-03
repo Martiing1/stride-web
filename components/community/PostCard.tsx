@@ -71,6 +71,7 @@ export function PostCard({ post, adminView = false, canLike = true }: { post: Fe
         post_id: post.id,
         parent_id: parentId,
         author_name: "Tú",
+        author_photo: null,
         is_staff: false,
         is_mine: true,
         body: text,
@@ -105,7 +106,14 @@ export function PostCard({ post, adminView = false, canLike = true }: { post: Fe
                 : "border border-[var(--sline2)] bg-gradient-to-br from-stride-cyan/20 to-stride-accent/40"
             )}
           >
-            {post.is_staff ? "S" : initialsOf(post.author_name)}
+            {post.author_photo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={post.author_photo} alt="" className="h-full w-full rounded-full object-cover" />
+            ) : post.is_staff ? (
+              "S"
+            ) : (
+              initialsOf(post.author_name)
+            )}
           </div>
           <div className="min-w-0">
             <p className="truncate font-heading text-sm font-bold">{post.is_mine ? "Tú" : post.author_name}</p>
@@ -115,7 +123,8 @@ export function PostCard({ post, adminView = false, canLike = true }: { post: Fe
                   <Pin className="h-3 w-3" /> Fijado ·
                 </span>
               )}
-              {timeAgo(post.created_at)} · {CHANNEL_LABEL[post.channel]}
+              <span suppressHydrationWarning>{timeAgo(post.created_at)}</span> ·{" "}
+              {CHANNEL_LABEL[post.channel]}
             </p>
           </div>
         </header>
@@ -321,7 +330,14 @@ function CommentRow({ comment, onReply }: { comment: FeedComment; onReply: () =>
           comment.is_staff ? "gradient-surface" : "bg-stride-accent/30"
         )}
       >
-        {comment.is_staff ? "S" : initialsOf(comment.author_name)}
+        {comment.author_photo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={comment.author_photo} alt="" className="h-full w-full rounded-full object-cover" />
+        ) : comment.is_staff ? (
+          "S"
+        ) : (
+          initialsOf(comment.author_name)
+        )}
       </span>
       <div className="min-w-0">
         <p className="leading-snug">

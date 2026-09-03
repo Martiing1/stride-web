@@ -22,6 +22,8 @@ export interface FeedComment {
   post_id: string;
   parent_id: string | null;
   author_name: string;
+  /** Ruta de la foto del autor, ya lista para <img>. Null = iniciales. */
+  author_photo: string | null;
   is_staff: boolean;
   is_mine: boolean;
   body: string;
@@ -37,6 +39,8 @@ export interface FeedPost {
   video_url: string | null;
   is_pinned: boolean;
   author_name: string;
+  /** Ruta de la foto del autor, ya lista para <img>. Null = iniciales. */
+  author_photo: string | null;
   is_staff: boolean;
   is_mine: boolean;
   event: { id: string; title: string; event_date: string; event_time: string | null; meeting_point: string | null; evently_url: string | null; spots_left: number | null; distance_km: number | null } | null;
@@ -238,8 +242,18 @@ interface RawPost {
   member_medal_id: string | null;
   event_id: string | null;
   created_at: string;
-  members: { full_name: string; display_name: string | null } | null;
-  team_members: { full_name: string; nickname: string | null } | null;
+  members: { full_name: string; display_name: string | null; photo_path: string | null } | null;
+  team_members: { full_name: string; nickname: string | null; photo_path: string | null } | null;
+}
+
+/** URL de la foto de perfil de un autor del feed, o null si no tiene. */
+function authorPhotoUrl(
+  member: { photo_path: string | null } | null,
+  staff: { photo_path: string | null } | null
+): string | null {
+  if (member?.photo_path) return `/api/miembros/foto?bucket=member-photos&path=${encodeURIComponent(member.photo_path)}`;
+  if (staff?.photo_path) return `/api/miembros/foto?bucket=team-photos&path=${encodeURIComponent(staff.photo_path)}`;
+  return null;
 }
 
 export async function getFeed(myMemberId: string | null, channel?: Channel | "all"): Promise<FeedPost[]> {
@@ -248,7 +262,7 @@ export async function getFeed(myMemberId: string | null, channel?: Channel | "al
   let query = service
     .from("community_posts")
     .select(
-      "id, channel, title, body, photo_paths, video_url, is_pinned, author_member_id, author_team_member_id, member_medal_id, event_id, created_at, members:author_member_id(full_name, display_name), team_members:author_team_member_id(full_name, nickname)"
+      "id, channel, title, body, photo_paths, video_url, is_pinned, author_member_id, author_team_member_id, member_medal_id, event_id, created_at, members:author_member_id(full_name, display_name, photo_path), team_members:author_team_member_id(full_name, nickname, photo_path)"
     )
     .order("is_pinned", { ascending: false })
     .order("created_at", { ascending: false })
@@ -265,11 +279,11 @@ export async function getFeed(myMemberId: string | null, channel?: Channel | "al
       [] as Array<{ post_id: string; member_id: string }>
     ),
     (async () => {
-      type RawComment = { id: string; post_id: string; parent_id: string | null; body: string; created_at: string; author_member_id: string | null; members: { full_name: string; display_name: string | null } | null; team_members: { full_name: string; nickname: string | null } | null };
+      type RawComment = { id: string; post_id: string; parent_id: string | null; body: string; created_at: string; author_member_id: string | null; members: { full_name: string; display_name: string | null; photo_path: string | null } | null; team_members: { full_name: string; nickname: string | null; photo_path: string | null } | null };
       try {
         const withParent = await service
           .from("community_comments")
-          .select("id, post_id, parent_id, body, created_at, author_member_id, members:author_member_id(full_name, display_name), team_members:author_team_member_id(full_name, nickname)")
+          .select("id, post_id, parent_id, body, created_at, author_member_id, members:author_member_id(full_name, display_name, photo_path), team_members:author_team_member_id(full_name, nickname, photo_path)")
           .in("post_id", ids)
           .order("created_at")
           .returns<RawComment[]>();
@@ -277,7 +291,7 @@ export async function getFeed(myMemberId: string | null, channel?: Channel | "al
         // Migración 013 pendiente: reintenta sin parent_id (hilos planos).
         const legacy = await service
           .from("community_comments")
-          .select("id, post_id, body, created_at, author_member_id, members:author_member_id(full_name, display_name), team_members:author_team_member_id(full_name, nickname)")
+          .select("id, post_id, body, created_at, author_member_id, members:author_member_id(full_name, display_name, photo_path), team_members:author_team_member_id(full_name, nickname, photo_path)")
           .in("post_id", ids)
           .order("created_at")
           .returns<Array<Omit<RawComment, "parent_id">>>();
@@ -328,6 +342,7 @@ export async function getFeed(myMemberId: string | null, channel?: Channel | "al
       is_staff: !c.author_member_id,
       is_mine: c.author_member_id === myMemberId,
       author_name: (c.members ? memberDisplayName(c.members) : null) ?? c.team_members?.nickname ?? c.team_members?.full_name ?? "STRIDE",
+      author_photo: authorPhotoUrl(c.members, c.team_members),
     });
     commentsByPost.set(c.post_id, list);
   }
@@ -348,6 +363,7 @@ export async function getFeed(myMemberId: string | null, channel?: Channel | "al
       video_url: p.video_url,
       is_pinned: p.is_pinned,
       author_name: p.author_member_id ? p.members ? memberDisplayName(p.members) : "Miembro" : "STRIDE",
+      author_photo: authorPhotoUrl(p.members, p.team_members),
       is_staff: !p.author_member_id,
       is_mine: Boolean(p.author_member_id && p.author_member_id === myMemberId),
       event: eventRow,

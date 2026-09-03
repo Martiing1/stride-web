@@ -9,7 +9,8 @@ export const dynamic = "force-dynamic";
  * Solo miembros con sesión; la evidencia de retos NO pasa por aquí (esa la ve
  * su dueño en el detalle del reto y el staff en el ERP).
  */
-const ALLOWED_BUCKETS = new Set(["post-photos", "medal-photos"]);
+// member-photos y team-photos: los avatares del feed y los comentarios.
+const ALLOWED_BUCKETS = new Set(["post-photos", "medal-photos", "member-photos", "team-photos"]);
 
 export async function GET(request: NextRequest) {
   const member = await getCurrentMember();
