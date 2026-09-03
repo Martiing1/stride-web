@@ -418,7 +418,7 @@ export async function saveHabit(input: {
   name: string;
   emoji: string;
   color: string;
-}): Promise<ActionResult> {
+}): Promise<ActionResult & { habit?: { id: string; name: string; emoji: string; color: string; sort_order: number } }> {
   const member = await getCurrentMember();
   if (!member) return err("Tu sesión venció.");
   const name = input.name.trim();
@@ -427,12 +427,19 @@ export async function saveHabit(input: {
 
   const service = createServiceClient();
   if (input.id) {
-    const { error } = await service
+    // El id tiene que ser un uuid de verdad: si el widget todavía no recibió el
+    // id real del servidor, se pide recargar en vez de reventar contra Postgres.
+    if (!/^[0-9a-f-]{36}$/i.test(input.id)) return err("Recarga la página y vuelve a intentarlo.");
+    const { data: updated, error } = await service
       .from("habits")
       .update({ name, emoji: input.emoji.slice(0, 8) || "✅", color: input.color })
       .eq("id", input.id)
-      .eq("member_id", member.id);
-    if (error) return err("No pudimos guardar el hábito.");
+      .eq("member_id", member.id)
+      .select("id, name, emoji, color, sort_order")
+      .maybeSingle();
+    if (error || !updated) return err("No pudimos guardar el hábito.");
+    revalidatePath("/miembros");
+    return { ok: true, habit: updated };
   } else {
     const { count } = await service
       .from("habits")
@@ -440,14 +447,20 @@ export async function saveHabit(input: {
       .eq("member_id", member.id)
       .eq("active", true);
     if ((count ?? 0) >= MAX_HABITS) return err(`Máximo ${MAX_HABITS} hábitos. Edita o elimina uno.`);
-    const { error } = await service.from("habits").insert({
-      member_id: member.id,
-      name,
-      emoji: input.emoji.slice(0, 8) || "✅",
-      color: input.color,
-      sort_order: count ?? 0,
-    });
-    if (error) return err("No pudimos crear el hábito.");
+    const { data: created, error } = await service
+      .from("habits")
+      .insert({
+        member_id: member.id,
+        name,
+        emoji: input.emoji.slice(0, 8) || "✅",
+        color: input.color,
+        sort_order: count ?? 0,
+      })
+      .select("id, name, emoji, color, sort_order")
+      .single();
+    if (error || !created) return err("No pudimos crear el hábito.");
+    revalidatePath("/miembros");
+    return { ok: true, habit: created };
   }
   revalidatePath("/miembros");
   return { ok: true };

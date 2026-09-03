@@ -7,7 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Camera, PenLine, Target, Upload, Video, X } from "lucide-react";
 import clsx from "clsx";
-import { reportTraining, uploadEvidence } from "@/app/miembros/community-actions";
+import { createPost, reportTraining, uploadEvidence } from "@/app/miembros/community-actions";
 import type { ChallengeView } from "@/lib/community";
 
 const CONFETTI = ["#00E5FF", "#6366F1", "#7C3AED", "#F59E0B", "#ffffff", "#c4b5fd"];
@@ -17,10 +17,11 @@ export function ChallengeCard({ challenge, highlight }: { challenge: ChallengeVi
   const [state, setState] = useState(challenge);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportFile, setReportFile] = useState<File | null>(null);
+  /** Segundo paso del popup: escribir el post antes de publicarlo. */
+  const [blogDraft, setBlogDraft] = useState<string | null>(null);
   const [wow, setWow] = useState<null | { title: string; points: number; medal: { name: string; rarity: string; emoji: string } | null }>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const fileRef = useRef<HTMLInputElement>(null);
   const reportFileRef = useRef<HTMLInputElement>(null);
   const reduced = useMemo(
     () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches,
@@ -72,6 +73,46 @@ export function ChallengeCard({ challenge, highlight }: { challenge: ChallengeVi
         setState((s) => ({ ...s, status: "cumplido" }));
         setWow(result.completed);
         burstScreen();
+      }
+      router.refresh();
+    });
+  };
+
+  /**
+   * Publica la evidencia en el blog. El propio post avanza el reto: createPost
+   * recibe el challengeId y se encarga del +1 o de dejar la foto en revisión,
+   * así la persona no tiene que hacer dos veces lo mismo.
+   */
+  const publishToBlog = () => {
+    if (blogDraft === null || pending) return;
+    const text = blogDraft.trim();
+    if (!text) return setError("Escribe algo antes de publicar.");
+    const file = reportFile;
+    setError(null);
+    startTransition(async () => {
+      const formData = new FormData();
+      formData.set("body", text);
+      formData.set("channel", "logros");
+      formData.set("challengeId", challenge.id);
+      if (file) formData.append("photos", await compressImage(file));
+      const result = await createPost(formData);
+      if (!result.ok) {
+        setError(result.error ?? "No pudimos publicar.");
+        return;
+      }
+      setReportOpen(false);
+      setBlogDraft(null);
+      setReportFile(null);
+      if (result.completed) {
+        setState((s) => ({ ...s, status: "cumplido" }));
+        setWow(result.completed);
+        burstScreen();
+      } else {
+        setState((s) =>
+          s.criterio === "evidencia"
+            ? { ...s, status: "en_verificacion" }
+            : { ...s, count: Math.min(s.count + 1, s.goal) }
+        );
       }
       router.refresh();
     });
@@ -148,16 +189,9 @@ export function ChallengeCard({ challenge, highlight }: { challenge: ChallengeVi
                 </span>
               ) : (
                 <>
-                  <input
-                    ref={fileRef}
-                    type="file"
-                    accept="image/*,video/mp4,video/quicktime"
-                    hidden
-                    onChange={(e) => sendEvidence(e.target.files?.[0] ?? null)}
-                  />
                   <button
                     type="button"
-                    onClick={() => fileRef.current?.click()}
+                    onClick={() => setReportOpen(true)}
                     disabled={pending}
                     className="flex items-center gap-2 rounded-full border border-[var(--sline2)] px-4 py-2.5 font-heading text-xs font-semibold text-[var(--smut)] transition hover:bg-[var(--shover)] disabled:opacity-60"
                   >
@@ -196,13 +230,16 @@ export function ChallengeCard({ challenge, highlight }: { challenge: ChallengeVi
               </button>
             </div>
             <p className="mt-1.5 text-sm text-[var(--smut)]">
-              Suma el {state.count + 1}º de {state.goal}. Si quieres, adjunta una foto como evidencia — el
-              staff la puede mirar al premiar.
+              {blogDraft !== null
+                ? "Cuéntalo como quieras. Se publica en el blog y el reto avanza solo."
+                : state.criterio === "evidencia"
+                  ? "Sube la foto o el video de tu evidencia. El staff la revisa y te avisa."
+                  : `Suma el ${state.count + 1}º de ${state.goal}. Si quieres, adjunta una foto como evidencia — el staff la puede mirar al premiar.`}
             </p>
             <input
               ref={reportFileRef}
               type="file"
-              accept="image/*"
+              accept="image/*,video/mp4,video/quicktime"
               hidden
               onChange={(e) => setReportFile(e.target.files?.[0] ?? null)}
             />
@@ -212,20 +249,72 @@ export function ChallengeCard({ challenge, highlight }: { challenge: ChallengeVi
               className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--sline2)] py-3 text-sm font-semibold text-[var(--smut)] transition hover:border-[var(--stext)] hover:text-[var(--stext)]"
             >
               <Camera className="h-4 w-4" />
-              {reportFile ? reportFile.name.slice(0, 28) : "Adjuntar evidencia (opcional)"}
+              {reportFile
+                ? reportFile.name.slice(0, 28)
+                : state.criterio === "evidencia"
+                  ? "Adjuntar evidencia"
+                  : "Adjuntar evidencia (opcional)"}
             </button>
-            <div className="mt-4 flex gap-2">
-              <button type="button" onClick={submitReport} disabled={pending} className="btn-primary flex-1 px-4 py-2.5 text-sm disabled:opacity-60">
-                {pending ? "Registrando…" : "Registrar"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setReportOpen(false)}
-                className="rounded-full border border-[var(--sline2)] px-4 py-2 text-sm text-[var(--smut)] hover:bg-[var(--shover)]"
-              >
-                Cancelar
-              </button>
-            </div>
+
+            {/* Paso 2: el mensaje del blog, editable antes de publicar. */}
+            {blogDraft !== null && (
+              <textarea
+                value={blogDraft}
+                onChange={(e) => setBlogDraft(e.target.value)}
+                rows={4}
+                maxLength={4000}
+                autoFocus
+                placeholder="Cuenta cómo te fue…"
+                className="mt-3 w-full resize-none rounded-xl border border-[var(--sline2)] bg-[var(--scard2)] px-3.5 py-3 text-sm leading-relaxed text-[var(--stext)] outline-none placeholder:text-[var(--sdim)] focus:border-stride-accent"
+              />
+            )}
+            {error && <p className="mt-3 text-xs font-semibold text-red-400">{error}</p>}
+
+            {blogDraft === null ? (
+              <div className="mt-4 space-y-2">
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={state.criterio === "evidencia" ? () => sendEvidence(reportFile) : submitReport}
+                    disabled={pending || (state.criterio === "evidencia" && !reportFile)}
+                    className="btn-primary flex-1 px-4 py-2.5 text-sm disabled:opacity-60"
+                  >
+                    {pending ? "Registrando…" : "Registrar"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReportOpen(false)}
+                    className="rounded-full border border-[var(--sline2)] px-4 py-2 text-sm text-[var(--smut)] hover:bg-[var(--shover)]"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError(null);
+                    setBlogDraft(`¡Avancé en «${state.title}»! `);
+                  }}
+                  disabled={pending}
+                  className="flex w-full items-center justify-center gap-2 rounded-full border border-stride-accent/40 py-2.5 font-heading text-sm font-bold text-stride-accent transition hover:bg-stride-accent hover:text-white disabled:opacity-60"
+                >
+                  <PenLine className="h-3.5 w-3.5" /> Dejarlo en el blog
+                </button>
+              </div>
+            ) : (
+              <div className="mt-4 flex gap-2">
+                <button type="button" onClick={publishToBlog} disabled={pending} className="btn-primary flex-1 px-4 py-2.5 text-sm disabled:opacity-60">
+                  {pending ? "Publicando…" : "Publicar"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBlogDraft(null)}
+                  className="rounded-full border border-[var(--sline2)] px-4 py-2 text-sm text-[var(--smut)] hover:bg-[var(--shover)]"
+                >
+                  Atrás
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

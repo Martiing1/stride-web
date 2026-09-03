@@ -10,8 +10,11 @@ import type { HabitsToday } from "@/lib/community";
 const COLORS = ["#00E5FF", "#6366F1", "#7C3AED", "#F59E0B", "#34D399", "#F472B6"];
 const CONFETTI = ["#00E5FF", "#6366F1", "#7C3AED", "#F59E0B", "#ffffff", "#c4b5fd"];
 const EMOJIS = [
-  "💧", "🏃", "😴", "📖", "🧘", "💪", "🥗", "🍎", "🚰", "⏰", "🌅", "🚶",
-  "🚴", "🏊", "🧠", "✍️", "📵", "🙏", "🦷", "💊", "🥦", "☕", "🎧", "🧊",
+  "💧", "🚰", "🥗", "🍎", "🥦", "🍳", "☕", "💊",
+  "🏃", "🚶", "🚴", "🏊", "💪", "🧘", "🤸", "⛰️",
+  "😴", "🌅", "⏰", "🧊", "🚿", "🦷", "🧴", "🌿",
+  "📖", "✍️", "🧠", "🎧", "🎯", "📵", "🙏", "🎨",
+  "🐕", "🌱", "💜", "🔥", "⭐", "✅", "🎵", "📸",
 ];
 
 /**
@@ -90,16 +93,18 @@ export function HabitsWidget({ initial }: { initial: HabitsToday }) {
         setError(result.error ?? "No pudimos guardar.");
         return;
       }
+      const saved = result.habit;
       setForm(null);
       setShowEmojis(false);
       setError(null);
-      router.refresh();
-      // Refresco optimista local para no esperar el round-trip.
+      // Se usa el id real que devolvió el servidor: sin esto, editar un hábito
+      // recién creado mandaba un id inventado y Postgres lo rechazaba.
       if (form.id) {
-        setHabits((prev) => prev.map((h) => (h.id === form.id ? { ...h, ...form } : h)));
-      } else {
-        setHabits((prev) => [...prev, { id: `tmp-${Date.now()}`, name: form.name, emoji: form.emoji, color: form.color, sort_order: prev.length, done_today: false }]);
+        setHabits((prev) => prev.map((h) => (h.id === form.id ? { ...h, ...form, ...(saved ?? {}) } : h)));
+      } else if (saved) {
+        setHabits((prev) => [...prev, { ...saved, done_today: false }]);
       }
+      router.refresh();
     });
   };
 
@@ -238,7 +243,7 @@ export function HabitsWidget({ initial }: { initial: HabitsToday }) {
                     {form.emoji}
                   </button>
                   {showEmojis && (
-                    <div className="absolute left-0 top-12 z-30 grid w-64 grid-cols-8 gap-1 rounded-2xl border border-[var(--sline)] bg-[var(--scard)] p-2 shadow-xl shadow-black/25">
+                    <div className="absolute left-0 top-12 z-30 grid w-[min(19rem,calc(100vw-3rem))] grid-cols-8 gap-1.5 rounded-2xl border border-[var(--sline)] bg-[var(--scard)] p-3 shadow-xl shadow-black/25">
                       {EMOJIS.map((emoji) => (
                         <button
                           key={emoji}
@@ -247,7 +252,7 @@ export function HabitsWidget({ initial }: { initial: HabitsToday }) {
                             setForm({ ...form, emoji });
                             setShowEmojis(false);
                           }}
-                          className="flex h-7 w-7 items-center justify-center rounded-lg text-base transition hover:bg-[var(--shover)]"
+                          className="flex h-9 w-9 items-center justify-center rounded-lg text-xl transition hover:bg-[var(--shover)] active:scale-95"
                         >
                           {emoji}
                         </button>
