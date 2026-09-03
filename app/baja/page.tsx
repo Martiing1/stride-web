@@ -1,21 +1,16 @@
-import { createHmac } from "node:crypto";
 import { createServiceClient } from "@/lib/supabase/server";
+import { firmaBaja } from "@/lib/baja";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Baja de correos", robots: { index: false, follow: false } };
 
 /**
  * Baja de las comunicaciones de STRIDE en un click.
- *
  * El enlace del correo trae el correo y una firma: sin la firma nadie puede
  * dar de baja a otra persona. Darse de baja es lo que evita que la gente
  * marque los correos como spam, que es lo que arruina la reputación del
  * dominio con el que los socios reciben su acceso.
  */
-export function firmaBaja(email: string): string {
-  const secreto = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "stride";
-  return createHmac("sha256", secreto).update(`baja:${email.toLowerCase()}`).digest("hex").slice(0, 16);
-}
 
 export default async function BajaPage({
   searchParams,
