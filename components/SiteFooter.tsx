@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Instagram } from "lucide-react";
+import { Instagram, LogIn, ShieldCheck } from "lucide-react";
 import { SITE, whatsappLink } from "@/lib/site";
 import { StrideLogo } from "@/components/StrideLogo";
 import { WhatsAppIcon } from "@/components/WhatsAppIcon";
@@ -29,6 +29,24 @@ export function SiteFooter() {
             <Link href="/privacidad" className="text-white/60 transition hover:text-white">
               Política de privacidad
             </Link>
+
+            {/* Accesos. El del equipo apunta al subdominio a propósito: el
+                dominio público no sirve /admin (lo devuelve a la portada). */}
+            <span className="mt-4 border-t border-white/5 pt-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/25">
+              Accesos
+            </span>
+            <Link
+              href="/miembros/ingresar"
+              className="flex items-center gap-2 text-white/60 transition hover:text-white"
+            >
+              <LogIn className="h-3.5 w-3.5" /> Área de miembros
+            </Link>
+            <a
+              href={SITE.adminUrl}
+              className="flex items-center gap-2 text-white/60 transition hover:text-white"
+            >
+              <ShieldCheck className="h-3.5 w-3.5" /> Acceso del equipo
+            </a>
           </div>
 
           <div className="flex gap-3">
