@@ -37,14 +37,14 @@ export function memberDisplayName(m: { display_name?: string | null; full_name: 
 }
 
 /**
- * Distinción mensual para quienes más comentaron. Se luce el mes siguiente al
+ * Distinción mensual para quien ganó el ranking. Se luce el mes siguiente al
  * medido, junto al nombre, en publicaciones y comentarios.
  */
 export const DISTINCTION = {
-  kind: "voz_del_mes",
-  label: "Voz del mes",
-  /** Cuántas personas se distinguen. Los empates en el corte entran todos. */
-  top: 3,
-  /** Comentarios mínimos en el mes para optar: evita premiar un mes muerto. */
-  minComments: 3,
+  kind: "numero_uno",
+  label: "Nº1 del mes",
+  /** Cuántas personas se distinguen. Los empates en el corte entran todas. */
+  top: 1,
+  /** Puntos mínimos en el mes para optar: un mes sin actividad no distingue a nadie. */
+  minPoints: 1,
 } as const;

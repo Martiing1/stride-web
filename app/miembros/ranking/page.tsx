@@ -1,7 +1,7 @@
 import clsx from "clsx";
 import { getCurrentMember, getCommunityStaff } from "@/lib/member-auth";
 import { getDistinctions, getMonthlyRanking, getPointsWeights } from "@/lib/community";
-import { VozBadge } from "@/components/community/VozBadge";
+import { NumeroUnoBadge } from "@/components/community/NumeroUnoBadge";
 import { todayInChile } from "@/lib/membership";
 import { PointsAdminPanel } from "@/components/community/PointsAdminPanel";
 
@@ -16,7 +16,7 @@ function initialsOf(name: string) {
 /** Ranking mensual por puntos, con entrada animada del podio y las filas. */
 export default async function RankingPage() {
   const [member, staff] = await Promise.all([getCurrentMember(), getCommunityStaff()]);
-  const [{ rows, mine }, weights, voces] = await Promise.all([
+  const [{ rows, mine }, weights, numerosUno] = await Promise.all([
     getMonthlyRanking(member?.id ?? "00000000-0000-0000-0000-000000000000"),
     getPointsWeights(),
     getDistinctions(),
@@ -44,6 +44,46 @@ export default async function RankingPage() {
         La tabla la ordenan los <b className="font-semibold text-[var(--stext)]">puntos</b> del mes: entrenar,
         asistir, cumplir retos y mover el blog.
       </p>
+
+      {/* El Nº1 del mes pasado luce la insignia todo este mes. Va arriba de la
+          tabla porque es la misma historia: quien más puntos hizo. */}
+      {numerosUno.length > 0 && (
+        <section className="rounded-2xl border border-amber-500/25 bg-[var(--scard)] p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <NumeroUnoBadge />
+            <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--sdim)]">
+              {numerosUno.length > 1 ? "Los Nº1" : "El Nº1"} de {prevMonth}
+            </h2>
+          </div>
+          <p className="mt-1.5 text-xs leading-relaxed text-[var(--smut)]">
+            {numerosUno.length > 1 ? "Ganaron" : "Ganó"} el ranking de {prevMonth.toLowerCase()} por puntos. La
+            insignia va junto a su nombre en publicaciones y comentarios durante todo{" "}
+            {MONTHS[month - 1].toLowerCase()}.
+          </p>
+          <ul className="mt-3 flex flex-wrap gap-2">
+            {numerosUno.map((uno) => (
+              <li
+                key={uno.member_id}
+                className={clsx(
+                  "flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm",
+                  uno.member_id === member?.id ? "border-amber-500/50 bg-amber-500/10" : "border-[var(--sline)]"
+                )}
+              >
+                <span className="flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-amber-500/40 to-stride-accent/40 font-heading text-[10px] font-bold text-white">
+                  {uno.photo ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={uno.photo} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    initialsOf(uno.name)
+                  )}
+                </span>
+                <span className="font-semibold">{uno.member_id === member?.id ? "Tú" : uno.name}</span>
+                <span className="text-xs text-[var(--sdim)]">{uno.score} puntos</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {rows.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[var(--sline2)] p-10 text-center">
@@ -127,50 +167,6 @@ export default async function RankingPage() {
           )}
         </div>
       )}
-
-      {/* Voces del mes: distinción por comentarios. Va DESPUÉS de la tabla y
-          lo dice explícito, porque se confundía con el ranking de puntos. */}
-      {voces.length > 0 && (
-        <section className="rounded-2xl border border-stride-accent/25 bg-[var(--scard)] p-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <VozBadge />
-            <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--sdim)]">
-              Voces de {MONTHS[month - 1]}
-            </h2>
-            <span className="ml-auto rounded-full border border-[var(--sline)] px-2.5 py-0.5 text-[10px] font-semibold text-[var(--sdim)]">
-              No suma puntos
-            </span>
-          </div>
-          <p className="mt-1.5 text-xs leading-relaxed text-[var(--smut)]">
-            Esto no es el ranking: es una distinción aparte para quienes más comentaron en{" "}
-            {prevMonth.toLowerCase()}. Llevan la insignia junto a su nombre todo el mes y no cambia en nada la
-            tabla de puntos.
-          </p>
-          <ul className="mt-3 flex flex-wrap gap-2">
-            {voces.map((voz) => (
-              <li
-                key={voz.member_id}
-                className={clsx(
-                  "flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm",
-                  voz.member_id === member?.id ? "border-stride-accent/50 bg-stride-accent/10" : "border-[var(--sline)]"
-                )}
-              >
-                <span className="flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-stride-cyan/30 to-stride-accent/40 font-heading text-[10px] font-bold text-white">
-                  {voz.photo ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={voz.photo} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    initialsOf(voz.name)
-                  )}
-                </span>
-                <span className="font-semibold">{voz.member_id === member?.id ? "Tú" : voz.name}</span>
-                <span className="text-xs text-[var(--sdim)]">{voz.score} comentarios</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
 
       {staff && <PointsAdminPanel initial={weights} />}
 

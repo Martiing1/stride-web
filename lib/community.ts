@@ -27,8 +27,8 @@ export interface FeedComment {
   author_photo: string | null;
   is_staff: boolean;
   is_mine: boolean;
-  /** Distinción vigente del autor ("voz_del_mes"), si tiene. */
-  author_badge?: "voz_del_mes" | null;
+  /** Distinción vigente del autor ("numero_uno"), si tiene. */
+  author_badge?: "numero_uno" | null;
   body: string;
   created_at: string;
 }
@@ -46,8 +46,8 @@ export interface FeedPost {
   author_photo: string | null;
   is_staff: boolean;
   is_mine: boolean;
-  /** Distinción vigente del autor ("voz_del_mes"), si tiene. */
-  author_badge?: "voz_del_mes" | null;
+  /** Distinción vigente del autor ("numero_uno"), si tiene. */
+  author_badge?: "numero_uno" | null;
   event: { id: string; title: string; event_date: string; event_time: string | null; meeting_point: string | null; evently_url: string | null; spots_left: number | null; distance_km: number | null } | null;
   medal: { name: string; rarity: string; emoji: string } | null;
   like_count: number;
@@ -280,7 +280,7 @@ export async function getFeed(myMemberId: string | null, channel?: Channel | "al
   if (posts.length === 0) return [];
 
   const ids = posts.map((p) => p.id);
-  const [likes, comments, medals, events, voces] = await Promise.all([
+  const [likes, comments, medals, events, distinguidos] = await Promise.all([
     safeQuery(
       () => service.from("community_likes").select("post_id, member_id").in("post_id", ids),
       [] as Array<{ post_id: string; member_id: string }>
@@ -349,7 +349,7 @@ export async function getFeed(myMemberId: string | null, channel?: Channel | "al
       created_at: c.created_at,
       is_staff: !c.author_member_id,
       is_mine: c.author_member_id === myMemberId,
-      author_badge: c.author_member_id && voces.has(c.author_member_id) ? "voz_del_mes" : null,
+      author_badge: c.author_member_id && distinguidos.has(c.author_member_id) ? "numero_uno" : null,
       author_name: (c.members ? memberDisplayName(c.members) : null) ?? c.team_members?.nickname ?? c.team_members?.full_name ?? "STRIDE",
       author_photo: authorPhotoUrl(c.members, c.team_members),
     });
@@ -375,7 +375,7 @@ export async function getFeed(myMemberId: string | null, channel?: Channel | "al
       author_photo: authorPhotoUrl(p.members, p.team_members),
       is_staff: !p.author_member_id,
       is_mine: Boolean(p.author_member_id && p.author_member_id === myMemberId),
-      author_badge: p.author_member_id && voces.has(p.author_member_id) ? "voz_del_mes" : null,
+      author_badge: p.author_member_id && distinguidos.has(p.author_member_id) ? "numero_uno" : null,
       event: eventRow,
       medal: medalRow
         ? medalRow.medals ?? { name: medalRow.title_override ?? "Medalla", rarity: "oro", emoji: "🏅" }
@@ -411,11 +411,11 @@ function distinctionWindowChile(): { showMonth: string; from: string; to: string
 }
 
 /**
- * Quiénes más comentaron entre `from` y `to`. Solo lectura. Devuelve el top
- * configurado y, si hay empate en el corte, a todos los empatados: nadie
+ * Quién sumó más puntos entre `from` y `to`: el Nº1 del ranking de ese mes.
+ * Solo lectura. Si hay empate en el corte entran todos los empatados: nadie
  * queda afuera por sorteo.
  */
-export async function computeTopCommenters(
+export async function computeTopScorers(
   from: string,
   to: string
 ): Promise<Array<{ member_id: string; score: number; rank: number }>> {
@@ -423,19 +423,18 @@ export async function computeTopCommenters(
   const rows = await safeQuery(
     () =>
       service
-        .from("community_comments")
-        .select("author_member_id")
-        .not("author_member_id", "is", null)
+        .from("points_ledger")
+        .select("member_id, points")
         .gte("created_at", from)
         .lt("created_at", to)
-        .returns<Array<{ author_member_id: string }>>(),
-    [] as Array<{ author_member_id: string }>
+        .returns<Array<{ member_id: string; points: number }>>(),
+    [] as Array<{ member_id: string; points: number }>
   );
-  const counts = new Map<string, number>();
-  for (const r of rows) counts.set(r.author_member_id, (counts.get(r.author_member_id) ?? 0) + 1);
+  const totals = new Map<string, number>();
+  for (const r of rows) totals.set(r.member_id, (totals.get(r.member_id) ?? 0) + r.points);
 
-  const sorted = [...counts.entries()]
-    .filter(([, n]) => n >= DISTINCTION.minComments)
+  const sorted = [...totals.entries()]
+    .filter(([, n]) => n >= DISTINCTION.minPoints)
     .sort((a, b) => b[1] - a[1]);
   if (sorted.length === 0) return [];
 
@@ -454,9 +453,9 @@ export async function computeTopCommenters(
 }
 
 /**
- * Voces del mes vigentes. La primera lectura de cada mes las calcula con los
- * comentarios del mes anterior, las guarda en community_distinctions y le
- * avisa a cada una por la campana; las lecturas siguientes solo leen. El
+ * Distinciones vigentes. La primera lectura de cada mes calcula quién ganó el
+ * ranking del mes anterior, lo guarda en community_distinctions y le
+ * avisa por la campana; las lecturas siguientes solo leen. El
  * unique de la tabla evita duplicados si dos visitas llegan a la vez, y como
  * el upsert devuelve solo las filas nuevas, el aviso sale una vez.
  */
@@ -485,7 +484,7 @@ export async function getDistinctions(): Promise<Distinction[]> {
 
   let rows = await read();
   if (rows.length === 0) {
-    const top = await computeTopCommenters(from, to);
+    const top = await computeTopScorers(from, to);
     if (top.length > 0) {
       const { data: inserted } = await service
         .from("community_distinctions")
@@ -496,8 +495,8 @@ export async function getDistinctions(): Promise<Distinction[]> {
         .select("member_id, score");
       for (const row of inserted ?? []) {
         await notify(row.member_id, {
-          title: `Eres ${DISTINCTION.label} 🎙️`,
-          body: `Fuiste de las voces que más sonaron el mes pasado (${row.score} comentarios). Este mes tu nombre lleva la insignia.`,
+          title: `Eres el ${DISTINCTION.label} 👑`,
+          body: `Ganaste el ranking del mes pasado con ${row.score} puntos. Este mes tu nombre lleva la insignia.`,
           kind: "distincion",
           href: "/miembros/ranking",
         });
