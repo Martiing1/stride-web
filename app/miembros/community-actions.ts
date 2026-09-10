@@ -975,6 +975,8 @@ export async function staffSaveChallenge(formData: FormData): Promise<ActionResu
   const goal = Math.max(1, Math.round(Number(formData.get("goal")) || 1));
   const points = Math.max(0, Math.round(Number(formData.get("points")) || 0));
   const medalId = String(formData.get("medal_id") ?? "") || null;
+  // Lo que nombra el botón "+1" (solo aplica al autoreporte). Null = "entrenamiento".
+  const unit = criterio === "cantidad" ? String(formData.get("unit") ?? "").trim().slice(0, 24) || null : null;
 
   if (!title) return err("Ponle título al reto.");
   if (!["mes", "semana", "hito", "general"].includes(period)) return err("Período inválido.");
@@ -986,7 +988,7 @@ export async function staffSaveChallenge(formData: FormData): Promise<ActionResu
   const monthly = period === "mes" || period === "semana";
   if (monthly && monthInput && !/^\d{4}-\d{2}$/.test(monthInput)) return err("Elige el mes del reto.");
   const month = monthly ? (monthInput || todayInChile().slice(0, 7)) + "-01" : null;
-  const row = { title, description, period, criterio, goal, points, medal_id: medalId, month };
+  const row = { title, description, period, criterio, goal, points, unit, medal_id: medalId, month };
 
   if (id) {
     const { error } = await service.from("challenges").update(row).eq("id", id);

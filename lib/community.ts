@@ -77,6 +77,8 @@ export interface ChallengeView {
   criterio: "asistencia" | "cantidad" | "evidencia";
   goal: number;
   points: number;
+  /** Qué se registra con el "+1" (avance, foto…). Null = "entrenamiento". */
+  unit: string | null;
   medal: { name: string; rarity: string; emoji: string } | null;
   count: number;
   status: "en_curso" | "en_verificacion" | "cumplido" | "rechazado";
@@ -520,12 +522,12 @@ export async function getChallenges(memberId: string): Promise<ChallengeView[]> 
     () =>
       service
         .from("challenges")
-        .select("id, title, description, period, criterio, goal, points, month, medals:medal_id(name, rarity, emoji)")
+        .select("id, title, description, period, criterio, goal, points, unit, month, medals:medal_id(name, rarity, emoji)")
         .eq("active", true)
         .or(`month.eq.${monthStart},month.is.null`)
         .order("period")
-        .returns<Array<{ id: string; title: string; description: string | null; period: ChallengeView["period"]; criterio: ChallengeView["criterio"]; goal: number; points: number; month: string | null; medals: { name: string; rarity: string; emoji: string } | null }>>(),
-    [] as Array<{ id: string; title: string; description: string | null; period: ChallengeView["period"]; criterio: ChallengeView["criterio"]; goal: number; points: number; month: string | null; medals: { name: string; rarity: string; emoji: string } | null }>
+        .returns<Array<{ id: string; title: string; description: string | null; period: ChallengeView["period"]; criterio: ChallengeView["criterio"]; goal: number; points: number; unit: string | null; month: string | null; medals: { name: string; rarity: string; emoji: string } | null }>>(),
+    [] as Array<{ id: string; title: string; description: string | null; period: ChallengeView["period"]; criterio: ChallengeView["criterio"]; goal: number; points: number; unit: string | null; month: string | null; medals: { name: string; rarity: string; emoji: string } | null }>
   );
   if (challenges.length === 0) return [];
 
@@ -568,6 +570,7 @@ export async function getChallenges(memberId: string): Promise<ChallengeView[]> 
       criterio: c.criterio,
       goal: c.goal,
       points: c.points,
+      unit: c.unit,
       medal: c.medals,
       count: Math.min(count, c.goal),
       status,
@@ -738,6 +741,7 @@ export interface AdminChallengeRow {
   criterio: "asistencia" | "cantidad" | "evidencia";
   goal: number;
   points: number;
+  unit: string | null;
   medal_id: string | null;
   month: string | null;
   active: boolean;
@@ -750,7 +754,7 @@ export async function getChallengesAdmin(): Promise<AdminChallengeRow[]> {
     () =>
       service
         .from("challenges")
-        .select("id, title, description, period, criterio, goal, points, medal_id, month, active")
+        .select("id, title, description, period, criterio, goal, points, unit, medal_id, month, active")
         .order("active", { ascending: false })
         .order("period")
         .order("created_at", { ascending: false })

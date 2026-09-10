@@ -29,6 +29,8 @@ export function ChallengeCard({ challenge, highlight }: { challenge: ChallengeVi
   );
 
   const pct = Math.min(100, Math.round((state.count / state.goal) * 100));
+  /** Qué se registra con el "+1": lo define el reto ("avance", "foto"…). */
+  const unit = state.unit?.trim() || "entrenamiento";
   const done = state.status === "cumplido";
 
   const burstScreen = () => {
@@ -180,7 +182,7 @@ export function ChallengeCard({ challenge, highlight }: { challenge: ChallengeVi
               </span>
             ) : state.criterio === "cantidad" ? (
               <button type="button" onClick={() => setReportOpen(true)} disabled={pending} className="btn-primary px-5 py-2.5 text-sm disabled:opacity-60">
-                +1 entrenamiento
+                +1 {unit}
               </button>
             ) : state.criterio === "evidencia" ? (
               state.status === "en_verificacion" ? (
@@ -224,7 +226,7 @@ export function ChallengeCard({ challenge, highlight }: { challenge: ChallengeVi
         <div className="fixed inset-0 z-[92] flex items-end justify-center bg-black/70 p-4 backdrop-blur-sm sm:items-center" onClick={(e) => e.target === e.currentTarget && setReportOpen(false)}>
           <div className="m-rowin w-full max-w-sm rounded-2xl border border-[var(--sline)] bg-[var(--scard)] p-5">
             <div className="flex items-center justify-between">
-              <h3 className="font-heading text-base font-bold">Registrar entrenamiento</h3>
+              <h3 className="font-heading text-base font-bold">Registrar {unit}</h3>
               <button type="button" aria-label="Cerrar" onClick={() => setReportOpen(false)} className="text-[var(--sdim)] hover:text-[var(--stext)]">
                 <X className="h-4 w-4" />
               </button>

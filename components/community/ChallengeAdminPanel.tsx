@@ -28,6 +28,8 @@ interface ChallengeDraft {
   criterio: string;
   goal: string;
   points: string;
+  /** Qué nombra el botón "+1" en el autoreporte. Vacío = "entrenamiento". */
+  unit: string;
   medal_id: string;
   /** YYYY-MM; solo aplica a retos del mes y micro-retos. */
   month: string;
@@ -42,6 +44,7 @@ const EMPTY: ChallengeDraft = {
   criterio: "cantidad",
   goal: "1",
   points: "0",
+  unit: "",
   medal_id: "",
   month: "",
 };
@@ -69,6 +72,7 @@ export function ChallengeAdminPanel({ challenges, medals }: { challenges: AdminC
       criterio: c.criterio,
       goal: String(c.goal),
       points: String(c.points),
+      unit: c.unit ?? "",
       medal_id: c.medal_id ?? "",
       month: c.month?.slice(0, 7) ?? "",
     });
@@ -200,6 +204,20 @@ export function ChallengeAdminPanel({ challenges, medals }: { challenges: AdminC
                   <input className={field} type="number" min="0" value={draft.points} onChange={(e) => setDraft({ ...draft, points: e.target.value })} />
                 </div>
               </div>
+              {draft.criterio === "cantidad" && (
+                <div>
+                  <label className={label}>Qué registra el «+1»</label>
+                  <input
+                    className={field}
+                    value={draft.unit}
+                    onChange={(e) => setDraft({ ...draft, unit: e.target.value })}
+                    placeholder="entrenamiento"
+                  />
+                  <p className="mt-1 text-[11px] leading-relaxed text-[var(--sdim)]">
+                    El botón dirá «+1 {draft.unit.trim() || "entrenamiento"}». Útil cuando el reto no es correr.
+                  </p>
+                </div>
+              )}
               <div>
                 <label className={label}>Medalla al cumplir (opcional)</label>
                 <select className={field} value={draft.medal_id} onChange={(e) => setDraft({ ...draft, medal_id: e.target.value })}>
