@@ -35,3 +35,16 @@ export const MAX_HABITS = 4;
 export function memberDisplayName(m: { display_name?: string | null; full_name: string }): string {
   return m.display_name?.trim() || m.full_name;
 }
+
+/**
+ * Distinción mensual para quienes más comentaron. Se luce el mes siguiente al
+ * medido, junto al nombre, en publicaciones y comentarios.
+ */
+export const DISTINCTION = {
+  kind: "voz_del_mes",
+  label: "Voz del mes",
+  /** Cuántas personas se distinguen. Los empates en el corte entran todos. */
+  top: 3,
+  /** Comentarios mínimos en el mes para optar: evita premiar un mes muerto. */
+  minComments: 3,
+} as const;

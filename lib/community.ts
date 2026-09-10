@@ -1,4 +1,5 @@
 import "server-only";
+import { DISTINCTION } from "@/lib/community-shared";
 
 import { createServiceClient } from "./supabase/server";
 import { safeQuery } from "./safe-query";
@@ -26,6 +27,8 @@ export interface FeedComment {
   author_photo: string | null;
   is_staff: boolean;
   is_mine: boolean;
+  /** Distinción vigente del autor ("voz_del_mes"), si tiene. */
+  author_badge?: "voz_del_mes" | null;
   body: string;
   created_at: string;
 }
@@ -43,6 +46,8 @@ export interface FeedPost {
   author_photo: string | null;
   is_staff: boolean;
   is_mine: boolean;
+  /** Distinción vigente del autor ("voz_del_mes"), si tiene. */
+  author_badge?: "voz_del_mes" | null;
   event: { id: string; title: string; event_date: string; event_time: string | null; meeting_point: string | null; evently_url: string | null; spots_left: number | null; distance_km: number | null } | null;
   medal: { name: string; rarity: string; emoji: string } | null;
   like_count: number;
@@ -275,7 +280,7 @@ export async function getFeed(myMemberId: string | null, channel?: Channel | "al
   if (posts.length === 0) return [];
 
   const ids = posts.map((p) => p.id);
-  const [likes, comments, medals, events] = await Promise.all([
+  const [likes, comments, medals, events, voces] = await Promise.all([
     safeQuery(
       () => service.from("community_likes").select("post_id, member_id").in("post_id", ids),
       [] as Array<{ post_id: string; member_id: string }>
@@ -323,6 +328,7 @@ export async function getFeed(myMemberId: string | null, channel?: Channel | "al
         [] as Array<{ id: string; title: string; event_date: string; event_time: string | null; meeting_point: string | null; evently_url: string | null; spots_left: number | null; distance_km: number | null }>
       );
     })(),
+    getDistinctions().then((rows) => new Set(rows.map((r) => r.member_id))),
   ]);
 
   const likesByPost = new Map<string, { count: number; mine: boolean }>();
@@ -343,6 +349,7 @@ export async function getFeed(myMemberId: string | null, channel?: Channel | "al
       created_at: c.created_at,
       is_staff: !c.author_member_id,
       is_mine: c.author_member_id === myMemberId,
+      author_badge: c.author_member_id && voces.has(c.author_member_id) ? "voz_del_mes" : null,
       author_name: (c.members ? memberDisplayName(c.members) : null) ?? c.team_members?.nickname ?? c.team_members?.full_name ?? "STRIDE",
       author_photo: authorPhotoUrl(c.members, c.team_members),
     });
@@ -368,6 +375,7 @@ export async function getFeed(myMemberId: string | null, channel?: Channel | "al
       author_photo: authorPhotoUrl(p.members, p.team_members),
       is_staff: !p.author_member_id,
       is_mine: Boolean(p.author_member_id && p.author_member_id === myMemberId),
+      author_badge: p.author_member_id && voces.has(p.author_member_id) ? "voz_del_mes" : null,
       event: eventRow,
       medal: medalRow
         ? medalRow.medals ?? { name: medalRow.title_override ?? "Medalla", rarity: "oro", emoji: "🏅" }
@@ -379,6 +387,134 @@ export async function getFeed(myMemberId: string | null, channel?: Channel | "al
       last_activity: postComments.length ? postComments[postComments.length - 1].created_at : p.created_at,
     };
   });
+}
+
+// ─── Distinciones ────────────────────────────────────────────────────────────
+
+export interface Distinction {
+  member_id: string;
+  name: string;
+  photo: string | null;
+  rank: number;
+  /** Comentarios hechos en el mes medido. */
+  score: number;
+}
+
+/** Mes en que SE LUCE la insignia (YYYY-MM-01) y límites ISO del mes medido (el anterior). */
+function distinctionWindowChile(): { showMonth: string; from: string; to: string } {
+  const [y, m] = todayInChile().split("-").map(Number);
+  const showMonth = `${y}-${String(m).padStart(2, "0")}-01`;
+  // Date.UTC resuelve solo el cambio de año (m-2 = -1 → diciembre anterior).
+  const from = new Date(Date.UTC(y, m - 2, 1, 4)).toISOString();
+  const to = new Date(Date.UTC(y, m - 1, 1, 4)).toISOString();
+  return { showMonth, from, to };
+}
+
+/**
+ * Quiénes más comentaron entre `from` y `to`. Solo lectura. Devuelve el top
+ * configurado y, si hay empate en el corte, a todos los empatados: nadie
+ * queda afuera por sorteo.
+ */
+export async function computeTopCommenters(
+  from: string,
+  to: string
+): Promise<Array<{ member_id: string; score: number; rank: number }>> {
+  const service = createServiceClient();
+  const rows = await safeQuery(
+    () =>
+      service
+        .from("community_comments")
+        .select("author_member_id")
+        .not("author_member_id", "is", null)
+        .gte("created_at", from)
+        .lt("created_at", to)
+        .returns<Array<{ author_member_id: string }>>(),
+    [] as Array<{ author_member_id: string }>
+  );
+  const counts = new Map<string, number>();
+  for (const r of rows) counts.set(r.author_member_id, (counts.get(r.author_member_id) ?? 0) + 1);
+
+  const sorted = [...counts.entries()]
+    .filter(([, n]) => n >= DISTINCTION.minComments)
+    .sort((a, b) => b[1] - a[1]);
+  if (sorted.length === 0) return [];
+
+  const cutoff = sorted[Math.min(DISTINCTION.top, sorted.length) - 1][1];
+  let rank = 0;
+  let prev = -1;
+  return sorted
+    .filter(([, n]) => n >= cutoff)
+    .map(([member_id, score]) => {
+      if (score !== prev) {
+        rank += 1;
+        prev = score;
+      }
+      return { member_id, score, rank };
+    });
+}
+
+/**
+ * Voces del mes vigentes. La primera lectura de cada mes las calcula con los
+ * comentarios del mes anterior, las guarda en community_distinctions y le
+ * avisa a cada una por la campana; las lecturas siguientes solo leen. El
+ * unique de la tabla evita duplicados si dos visitas llegan a la vez, y como
+ * el upsert devuelve solo las filas nuevas, el aviso sale una vez.
+ */
+export async function getDistinctions(): Promise<Distinction[]> {
+  const service = createServiceClient();
+  const { showMonth, from, to } = distinctionWindowChile();
+  type Row = {
+    member_id: string;
+    rank: number;
+    score: number;
+    members: { full_name: string; display_name: string | null; photo_path: string | null } | null;
+  };
+  const read = () =>
+    safeQuery(
+      () =>
+        service
+          .from("community_distinctions")
+          .select("member_id, rank, score, members:member_id(full_name, display_name, photo_path)")
+          .eq("month", showMonth)
+          .eq("kind", DISTINCTION.kind)
+          .order("rank")
+          .order("score", { ascending: false })
+          .returns<Row[]>(),
+      [] as Row[]
+    );
+
+  let rows = await read();
+  if (rows.length === 0) {
+    const top = await computeTopCommenters(from, to);
+    if (top.length > 0) {
+      const { data: inserted } = await service
+        .from("community_distinctions")
+        .upsert(
+          top.map((t) => ({ month: showMonth, kind: DISTINCTION.kind, member_id: t.member_id, rank: t.rank, score: t.score })),
+          { onConflict: "month,kind,member_id", ignoreDuplicates: true }
+        )
+        .select("member_id, score");
+      for (const row of inserted ?? []) {
+        await notify(row.member_id, {
+          title: `Eres ${DISTINCTION.label} 🎙️`,
+          body: `Fuiste de las voces que más sonaron el mes pasado (${row.score} comentarios). Este mes tu nombre lleva la insignia.`,
+          kind: "distincion",
+          href: "/miembros/ranking",
+        });
+      }
+      rows = await read();
+    }
+  }
+
+  return rows.map((r) => ({
+    member_id: r.member_id,
+    rank: r.rank,
+    score: r.score,
+    name: r.members ? memberDisplayName(r.members) : "Miembro",
+    photo: r.members?.photo_path
+      ? `/api/miembros/foto?bucket=member-photos&path=${encodeURIComponent(r.members.photo_path)}`
+      : null,
+  }));
 }
 
 // ─── Hábitos ─────────────────────────────────────────────────────────────────

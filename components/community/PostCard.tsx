@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Calendar, Heart, MapPin, MessageCircle, Pin, PinOff, Send, Trash2, X } from "lucide-react";
+import { VozBadge } from "@/components/community/VozBadge";
 import clsx from "clsx";
 import { addComment, staffDeletePost, staffTogglePin, toggleLike } from "@/app/miembros/community-actions";
 import { formatDateCL } from "@/lib/membership";
@@ -116,7 +117,10 @@ export function PostCard({ post, adminView = false, canLike = true }: { post: Fe
             )}
           </div>
           <div className="min-w-0">
-            <p className="truncate font-heading text-sm font-bold">{post.is_mine ? "Tú" : post.author_name}</p>
+            <p className="flex min-w-0 items-center gap-1.5 font-heading text-sm font-bold">
+              <span className="truncate">{post.is_mine ? "Tú" : post.author_name}</span>
+              {post.author_badge && <VozBadge />}
+            </p>
             <p className="flex items-center gap-1.5 text-xs text-[var(--sdim)]">
               {post.is_pinned && (
                 <span className="flex items-center gap-1 font-semibold uppercase tracking-wide text-stride-accent">
@@ -341,7 +345,8 @@ function CommentRow({ comment, onReply }: { comment: FeedComment; onReply: () =>
       </span>
       <div className="min-w-0">
         <p className="leading-snug">
-          <span className="font-heading font-bold">{comment.is_mine ? "Tú" : comment.author_name}</span>{" "}
+          <span className="font-heading font-bold">{comment.is_mine ? "Tú" : comment.author_name}</span>
+          {comment.author_badge && <VozBadge className="ml-1 align-[2px]" />}{" "}
           <span className="text-[var(--smut)]">{comment.body}</span>
         </p>
         <button type="button" onClick={onReply} className="mt-0.5 text-[11px] font-semibold text-[var(--sdim)] hover:text-stride-accent">

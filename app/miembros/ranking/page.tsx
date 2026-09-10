@@ -1,6 +1,7 @@
 import clsx from "clsx";
 import { getCurrentMember, getCommunityStaff } from "@/lib/member-auth";
-import { getMonthlyRanking, getPointsWeights } from "@/lib/community";
+import { getDistinctions, getMonthlyRanking, getPointsWeights } from "@/lib/community";
+import { VozBadge } from "@/components/community/VozBadge";
 import { todayInChile } from "@/lib/membership";
 import { PointsAdminPanel } from "@/components/community/PointsAdminPanel";
 
@@ -15,9 +16,10 @@ function initialsOf(name: string) {
 /** Ranking mensual por puntos, con entrada animada del podio y las filas. */
 export default async function RankingPage() {
   const [member, staff] = await Promise.all([getCurrentMember(), getCommunityStaff()]);
-  const [{ rows, mine }, weights] = await Promise.all([
+  const [{ rows, mine }, weights, voces] = await Promise.all([
     getMonthlyRanking(member?.id ?? "00000000-0000-0000-0000-000000000000"),
     getPointsWeights(),
+    getDistinctions(),
   ]);
 
   const today = todayInChile();
@@ -25,6 +27,7 @@ export default async function RankingPage() {
   const daysInMonth = new Date(year, month, 0).getDate();
   const resetIn = daysInMonth - day + 1;
 
+  const prevMonth = MONTHS[(month + 10) % 12];
   const podium = rows.slice(0, 3);
   const rest = rows.slice(3, 10);
   const myIndex = rows.findIndex((row) => row.is_me);
@@ -37,6 +40,44 @@ export default async function RankingPage() {
           se reinicia en {resetIn} {resetIn === 1 ? "día" : "días"}
         </span>
       </div>
+
+      {/* Voces del mes: quienes más comentaron el mes pasado lucen la insignia
+          junto a su nombre durante todo este mes. */}
+      {voces.length > 0 && (
+        <section className="rounded-2xl border border-stride-accent/25 bg-[var(--scard)] p-4">
+          <div className="flex items-center gap-2">
+            <VozBadge />
+            <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--sdim)]">
+              Voces de {MONTHS[month - 1]}
+            </h2>
+          </div>
+          <p className="mt-1.5 text-xs text-[var(--smut)]">
+            Quienes más comentaron en {prevMonth.toLowerCase()}. Llevan la insignia junto a su nombre todo el mes.
+          </p>
+          <ul className="mt-3 flex flex-wrap gap-2">
+            {voces.map((voz) => (
+              <li
+                key={voz.member_id}
+                className={clsx(
+                  "flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm",
+                  voz.member_id === member?.id ? "border-stride-accent/50 bg-stride-accent/10" : "border-[var(--sline)]"
+                )}
+              >
+                <span className="flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-stride-cyan/30 to-stride-accent/40 font-heading text-[10px] font-bold text-white">
+                  {voz.photo ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={voz.photo} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    initialsOf(voz.name)
+                  )}
+                </span>
+                <span className="font-semibold">{voz.member_id === member?.id ? "Tú" : voz.name}</span>
+                <span className="text-xs text-[var(--sdim)]">{voz.score}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {rows.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[var(--sline2)] p-10 text-center">
