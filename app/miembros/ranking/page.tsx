@@ -40,44 +40,10 @@ export default async function RankingPage() {
           se reinicia en {resetIn} {resetIn === 1 ? "día" : "días"}
         </span>
       </div>
-
-      {/* Voces del mes: quienes más comentaron el mes pasado lucen la insignia
-          junto a su nombre durante todo este mes. */}
-      {voces.length > 0 && (
-        <section className="rounded-2xl border border-stride-accent/25 bg-[var(--scard)] p-4">
-          <div className="flex items-center gap-2">
-            <VozBadge />
-            <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--sdim)]">
-              Voces de {MONTHS[month - 1]}
-            </h2>
-          </div>
-          <p className="mt-1.5 text-xs text-[var(--smut)]">
-            Quienes más comentaron en {prevMonth.toLowerCase()}. Llevan la insignia junto a su nombre todo el mes.
-          </p>
-          <ul className="mt-3 flex flex-wrap gap-2">
-            {voces.map((voz) => (
-              <li
-                key={voz.member_id}
-                className={clsx(
-                  "flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm",
-                  voz.member_id === member?.id ? "border-stride-accent/50 bg-stride-accent/10" : "border-[var(--sline)]"
-                )}
-              >
-                <span className="flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-stride-cyan/30 to-stride-accent/40 font-heading text-[10px] font-bold text-white">
-                  {voz.photo ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={voz.photo} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    initialsOf(voz.name)
-                  )}
-                </span>
-                <span className="font-semibold">{voz.member_id === member?.id ? "Tú" : voz.name}</span>
-                <span className="text-xs text-[var(--sdim)]">{voz.score}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      <p className="-mt-2 px-1 text-xs text-[var(--smut)]">
+        La tabla la ordenan los <b className="font-semibold text-[var(--stext)]">puntos</b> del mes: entrenar,
+        asistir, cumplir retos y mover el blog.
+      </p>
 
       {rows.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[var(--sline2)] p-10 text-center">
@@ -161,6 +127,50 @@ export default async function RankingPage() {
           )}
         </div>
       )}
+
+      {/* Voces del mes: distinción por comentarios. Va DESPUÉS de la tabla y
+          lo dice explícito, porque se confundía con el ranking de puntos. */}
+      {voces.length > 0 && (
+        <section className="rounded-2xl border border-stride-accent/25 bg-[var(--scard)] p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <VozBadge />
+            <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--sdim)]">
+              Voces de {MONTHS[month - 1]}
+            </h2>
+            <span className="ml-auto rounded-full border border-[var(--sline)] px-2.5 py-0.5 text-[10px] font-semibold text-[var(--sdim)]">
+              No suma puntos
+            </span>
+          </div>
+          <p className="mt-1.5 text-xs leading-relaxed text-[var(--smut)]">
+            Esto no es el ranking: es una distinción aparte para quienes más comentaron en{" "}
+            {prevMonth.toLowerCase()}. Llevan la insignia junto a su nombre todo el mes y no cambia en nada la
+            tabla de puntos.
+          </p>
+          <ul className="mt-3 flex flex-wrap gap-2">
+            {voces.map((voz) => (
+              <li
+                key={voz.member_id}
+                className={clsx(
+                  "flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm",
+                  voz.member_id === member?.id ? "border-stride-accent/50 bg-stride-accent/10" : "border-[var(--sline)]"
+                )}
+              >
+                <span className="flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-stride-cyan/30 to-stride-accent/40 font-heading text-[10px] font-bold text-white">
+                  {voz.photo ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={voz.photo} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    initialsOf(voz.name)
+                  )}
+                </span>
+                <span className="font-semibold">{voz.member_id === member?.id ? "Tú" : voz.name}</span>
+                <span className="text-xs text-[var(--sdim)]">{voz.score} comentarios</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
 
       {staff && <PointsAdminPanel initial={weights} />}
 
