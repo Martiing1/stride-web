@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { Bell, MessageCircle, Medal, Star, CalendarDays, Target, Pause, CircleAlert } from "lucide-react";
+import { Bell, MessageCircle, Medal, Star, CalendarDays, Target, Pause, CircleAlert, Crown } from "lucide-react";
 import clsx from "clsx";
 import { markNotificationsRead } from "@/app/miembros/community-actions";
 import type { MemberNotification } from "@/lib/community";
@@ -11,6 +11,7 @@ const KIND_ICONS: Record<string, React.ComponentType<{ className?: string }>> = 
   comment: MessageCircle,
   like: Star,
   medal: Medal,
+  distincion: Crown,
   points: Star,
   event: CalendarDays,
   reto: Target,

@@ -47,4 +47,6 @@ export const DISTINCTION = {
   top: 1,
   /** Puntos mínimos en el mes para optar: un mes sin actividad no distingue a nadie. */
   minPoints: 1,
+  /** Medalla del catálogo que se otorga sola al coronar. */
+  medalName: "Nº1 del mes",
 } as const;

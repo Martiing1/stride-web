@@ -493,12 +493,31 @@ export async function getDistinctions(): Promise<Distinction[]> {
           { onConflict: "month,kind,member_id", ignoreDuplicates: true }
         )
         .select("member_id, score");
+      // La medalla del Nº1 se entrega sola: una por mes ganado, porque solo
+      // se llega acá con las filas recién insertadas.
+      const { data: medal } = await service
+        .from("medals")
+        .select("id")
+        .eq("name", DISTINCTION.medalName)
+        .eq("active", true)
+        .maybeSingle();
+
       for (const row of inserted ?? []) {
+        let medalGiven = false;
+        if (medal?.id) {
+          const { error } = await service
+            .from("member_medals")
+            .insert({ member_id: row.member_id, medal_id: medal.id, status: "otorgada" });
+          if (error) console.error("[community] medalla Nº1", error.message);
+          else medalGiven = true;
+        }
         await notify(row.member_id, {
           title: `Eres el ${DISTINCTION.label} 👑`,
-          body: `Ganaste el ranking del mes pasado con ${row.score} puntos. Este mes tu nombre lleva la insignia.`,
+          body: `Ganaste el ranking del mes pasado con ${row.score} puntos.${
+            medalGiven ? " Tu medalla ya está en la vitrina y" : ""
+          } este mes tu nombre lleva la insignia.`,
           kind: "distincion",
-          href: "/miembros/ranking",
+          href: medalGiven ? "/miembros/perfil" : "/miembros/ranking",
         });
       }
       rows = await read();
