@@ -1,6 +1,7 @@
 import { getCurrentMember, getCommunityStaff } from "@/lib/member-auth";
 import { getChallenges, getChallengesAdmin, getMedalOptions, getMonthlyRanking } from "@/lib/community";
 import { ChallengeCard } from "@/components/community/ChallengeCard";
+import { HitoTile } from "@/components/community/HitoTile";
 import { ChallengeAdminPanel } from "@/components/community/ChallengeAdminPanel";
 
 export const dynamic = "force-dynamic";
@@ -81,23 +82,9 @@ export default async function RetosPage() {
             Hitos permanentes
           </h2>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {hitos.map((hito) => {
-              const done = hito.status === "cumplido";
-              return (
-                <div
-                  key={hito.id}
-                  className={
-                    done
-                      ? "rounded-2xl border border-amber-500/40 bg-[var(--scard)] px-3 py-4 text-center"
-                      : "rounded-2xl border border-[var(--sline)] bg-[var(--scard)] px-3 py-4 text-center opacity-50 grayscale"
-                  }
-                >
-                  <span className="text-2xl">{hito.medal?.emoji ?? "🏅"}</span>
-                  <p className="mt-1.5 font-heading text-[11px] font-bold leading-tight">{hito.title}</p>
-                  <p className="mt-0.5 text-[10px] text-[var(--sdim)]">{done ? "conseguido" : "bloqueado"}</p>
-                </div>
-              );
-            })}
+            {hitos.map((hito) => (
+              <HitoTile key={hito.id} hito={hito} />
+            ))}
           </div>
         </section>
       )}

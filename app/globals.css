@@ -331,3 +331,42 @@ html[data-admin-theme="light"] .text-red-400, html[data-admin-theme="light"] .te
 html[data-admin-theme="light"] .text-cyan-300 { color: #0e7490; }
 html[data-admin-theme="light"] .text-sky-300 { color: #0369a1; }
 html[data-admin-theme="light"] .text-stride-indigo { color: #4f46e5; }
+
+/*
+ * Damero detrás de la vista previa del sticker: es la forma universal de
+ * mostrar que el PNG va con fondo transparente.
+ */
+.share-checker {
+  background-color: #16161d;
+  background-image:
+    linear-gradient(45deg, rgba(255, 255, 255, 0.06) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(255, 255, 255, 0.06) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.06) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.06) 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+}
+
+/* La medalla entra al popup con un rebote: escala desde chico y se asienta. */
+@keyframes medal-pop {
+  0% {
+    transform: scale(0.35) rotate(-14deg);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.12) rotate(3deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(0);
+    opacity: 1;
+  }
+}
+.medal-pop {
+  animation: medal-pop 0.75s cubic-bezier(0.2, 0.9, 0.3, 1.25) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .medal-pop {
+    animation: none;
+  }
+}

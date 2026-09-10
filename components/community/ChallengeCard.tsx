@@ -2,15 +2,17 @@
 
 import { compressImage } from "@/lib/image-client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Camera, PenLine, Target, Upload, Video, X } from "lucide-react";
 import clsx from "clsx";
 import { createPost, reportTraining, uploadEvidence } from "@/app/miembros/community-actions";
+import { ShareButton } from "@/components/community/ShareCardModal";
+import { ChallengeCelebration, type Completed } from "@/components/community/ChallengeCelebration";
+import { RARITY_LABEL, asRarity } from "@/components/community/MedalBadge";
+import { unitLabel, type ShareCardData, type ShareStat } from "@/lib/share-card";
 import type { ChallengeView } from "@/lib/community";
-
-const CONFETTI = ["#00E5FF", "#6366F1", "#7C3AED", "#F59E0B", "#ffffff", "#c4b5fd"];
 
 export function ChallengeCard({ challenge, highlight }: { challenge: ChallengeView; highlight?: boolean }) {
   const router = useRouter();
@@ -19,38 +21,35 @@ export function ChallengeCard({ challenge, highlight }: { challenge: ChallengeVi
   const [reportFile, setReportFile] = useState<File | null>(null);
   /** Segundo paso del popup: escribir el post antes de publicarlo. */
   const [blogDraft, setBlogDraft] = useState<string | null>(null);
-  const [wow, setWow] = useState<null | { title: string; points: number; medal: { name: string; rarity: string; emoji: string } | null }>(null);
+  const [wow, setWow] = useState<Completed | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const reportFileRef = useRef<HTMLInputElement>(null);
-  const reduced = useMemo(
-    () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-    []
-  );
 
   const pct = Math.min(100, Math.round((state.count / state.goal) * 100));
   /** Qué se registra con el "+1": lo define el reto ("avance", "foto"…). */
   const unit = state.unit?.trim() || "entrenamiento";
   const done = state.status === "cumplido";
+  /** Se puede compartir cuando ya hay algo que mostrar. */
+  const shareable = done || state.count > 0 || state.status === "en_verificacion";
 
-  const burstScreen = () => {
-    if (reduced) return;
-    const host = document.createElement("div");
-    host.style.cssText = "position:fixed;inset:0;pointer-events:none;z-index:95;overflow:hidden";
-    document.body.appendChild(host);
-    for (let i = 0; i < 42; i++) {
-      const piece = document.createElement("i");
-      piece.style.cssText = `position:absolute;top:-16px;left:${2 + Math.random() * 96}%;width:8px;height:12px;border-radius:2px;background:${CONFETTI[i % CONFETTI.length]}`;
-      host.appendChild(piece);
-      piece.animate(
-        [
-          { transform: "translateY(0) rotate(0)", opacity: 1 },
-          { transform: `translateY(${window.innerHeight * 0.85}px) rotate(${Math.random() > 0.5 ? "" : "-"}${300 + Math.random() * 420}deg)`, opacity: 0 },
-        ],
-        { duration: 1600 + Math.random() * 1200, delay: Math.random() * 400, easing: "cubic-bezier(.15,.6,.4,1)", fill: "forwards" }
-      );
+  /**
+   * Datos de la tarjeta de Instagram. Sin ritmo ni velocidad: las cifras son
+   * de constancia (avance, puntos, medalla), como manda la marca.
+   */
+  const shareData = (): ShareCardData => {
+    const stats: ShareStat[] = [];
+    if (state.criterio !== "evidencia" && state.goal > 1) {
+      stats.push({ label: unitLabel(state.unit), value: `${state.count}/${state.goal}` });
     }
-    window.setTimeout(() => host.remove(), 3400);
+    stats.push({ label: "Puntos", value: `+${state.points}` });
+    if (done && state.medal) stats.push({ label: "Medalla", value: RARITY_LABEL[state.medal.rarity] ?? state.medal.rarity, tint: true });
+    return {
+      headline: done ? "Reto cumplido" : state.status === "en_verificacion" ? "Reto enviado" : "Voy avanzando",
+      title: state.title,
+      stats,
+      medal: done ? asRarity(state.medal?.rarity) : null,
+    };
   };
 
   /** Envía el +1 (con evidencia opcional desde el popup). */
@@ -74,7 +73,6 @@ export function ChallengeCard({ challenge, highlight }: { challenge: ChallengeVi
       if (result.completed) {
         setState((s) => ({ ...s, status: "cumplido" }));
         setWow(result.completed);
-        burstScreen();
       }
       router.refresh();
     });
@@ -108,7 +106,6 @@ export function ChallengeCard({ challenge, highlight }: { challenge: ChallengeVi
       if (result.completed) {
         setState((s) => ({ ...s, status: "cumplido" }));
         setWow(result.completed);
-        burstScreen();
       } else {
         setState((s) =>
           s.criterio === "evidencia"
@@ -216,6 +213,15 @@ export function ChallengeCard({ challenge, highlight }: { challenge: ChallengeVi
                 <PenLine className="h-3.5 w-3.5" /> Publicar en el blog
               </Link>
             )}
+
+            {/* Afuera: la misma historia, pero para Instagram */}
+            {shareable && (
+              <ShareButton
+                data={shareData()}
+                label="Compartir"
+                className={done ? "border-stride-accent/40 text-stride-accent" : undefined}
+              />
+            )}
           </div>
           {error && <p className="mt-2.5 text-xs font-semibold text-red-400">{error}</p>}
         </div>
@@ -321,28 +327,7 @@ export function ChallengeCard({ challenge, highlight }: { challenge: ChallengeVi
         </div>
       )}
 
-      {/* WOW */}
-      {wow && (
-        <div className="fixed inset-0 z-[96] flex items-center justify-center bg-black/85 p-6 text-center backdrop-blur-md">
-          <div className="m-rowin max-w-xs">
-            <div className="text-[88px] leading-none drop-shadow-[0_14px_30px_rgba(245,158,11,.4)]">
-              {wow.medal?.emoji ?? "🏅"}
-            </div>
-            <h2 className="wordmark mt-4 font-heading text-2xl font-extrabold">¡RETO CUMPLIDO!</h2>
-            {wow.medal && (
-              <p className="mt-1 font-heading text-sm font-bold text-amber-400">
-                Medalla {wow.medal.name} · {wow.medal.rarity === "oro" ? "Oro" : wow.medal.rarity}
-              </p>
-            )}
-            <p className="mt-2 text-sm text-white/70">
-              +{wow.points} pts{wow.medal ? " · ya brilla en tu vitrina" : ""}
-            </p>
-            <button type="button" onClick={() => setWow(null)} className="btn-primary mt-6 w-full px-6 py-3 text-sm">
-              ¡Vamos!
-            </button>
-          </div>
-        </div>
-      )}
+      {wow && <ChallengeCelebration completed={wow} share={shareData()} onClose={() => setWow(null)} />}
     </>
   );
 }

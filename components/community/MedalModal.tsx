@@ -7,9 +7,9 @@ import { useRouter } from "next/navigation";
 import { Camera, X } from "lucide-react";
 import clsx from "clsx";
 import { saveMedalMemory } from "@/app/miembros/community-actions";
+import { ShareButton } from "@/components/community/ShareCardModal";
+import { MedalBadge, RARITY_LABEL, asRarity } from "@/components/community/MedalBadge";
 import type { VitrinaMedal } from "@/lib/community";
-
-const RARITY_LABEL: Record<string, string> = { oro: "Oro", plata: "Plata", bronce: "Bronce" };
 const RARITY_BORDER: Record<string, string> = {
   oro: "border-amber-500/40",
   plata: "border-slate-300/40",
@@ -70,7 +70,7 @@ export function MedalGrid({ medals, children }: { medals: VitrinaMedal[]; childr
               // eslint-disable-next-line @next/next/no-img-element
               <img src={medal.photo_url} alt={medal.name} className="mx-auto h-12 w-12 rounded-full border border-[var(--sline2)] object-cover" />
             ) : (
-              <span className="text-2xl">{medal.emoji}</span>
+              <MedalBadge rarity={medal.rarity} emoji={medal.emoji} size={48} muted={medal.status === "en_revision"} className="mx-auto" />
             )}
             <p className="mt-1.5 font-heading text-[11px] font-bold leading-tight">{medal.name}</p>
             <p className="mt-0.5 text-[10px] text-[var(--sdim)]">
@@ -95,7 +95,7 @@ export function MedalGrid({ medals, children }: { medals: VitrinaMedal[]; childr
               // eslint-disable-next-line @next/next/no-img-element
               <img src={open.photo_url} alt={open.name} className="mx-auto h-28 w-28 rounded-2xl border border-[var(--sline2)] object-cover" />
             ) : (
-              <div className="text-6xl drop-shadow-[0_10px_24px_rgba(245,158,11,.3)]">{open.emoji}</div>
+              <MedalBadge rarity={open.rarity} emoji={open.emoji} size={112} className="mx-auto drop-shadow-[0_12px_28px_rgba(245,158,11,.3)]" />
             )}
             <h3 className="mt-3 font-heading text-lg font-bold">{open.name}</h3>
             <p className="mt-0.5 text-xs text-[var(--sdim)]">
@@ -127,6 +127,22 @@ export function MedalGrid({ medals, children }: { medals: VitrinaMedal[]; childr
             <button type="button" onClick={save} disabled={pending} className="btn-primary mt-3 w-full px-4 py-2.5 text-sm disabled:opacity-60">
               {pending ? "Guardando…" : "Guardar recuerdo"}
             </button>
+            {/* Una medalla es para mostrarla: mismo popup que los retos. */}
+            {open.status !== "en_revision" && (
+              <ShareButton
+                className="mt-2 w-full justify-center"
+                label="Compartir en Instagram"
+                data={{
+                  headline: "Nueva medalla",
+                  title: open.name,
+                  stats: [
+                    { label: "Medalla", value: RARITY_LABEL[open.rarity] ?? open.rarity, tint: true },
+                    { label: "Conseguida", value: new Date(open.awarded_at).toLocaleDateString("es-CL", { day: "numeric", month: "short" }) },
+                  ],
+                  medal: asRarity(open.rarity),
+                }}
+              />
+            )}
             {error && <p className="mt-2 text-xs font-semibold text-red-400">{error}</p>}
           </div>
         </div>

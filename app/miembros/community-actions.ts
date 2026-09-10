@@ -20,7 +20,13 @@ export interface ActionResult {
   /** Aviso no bloqueante (ej: el post salió pero el reto no avanzó). */
   info?: string;
   /** Para el efecto wow al completar un reto. */
-  completed?: { title: string; points: number; medal: { name: string; rarity: string; emoji: string } | null };
+  completed?: {
+    title: string;
+    points: number;
+    medal: { name: string; rarity: string; emoji: string } | null;
+    /** Fila de member_medals recién creada: sirve para publicarla al blog desde el popup. */
+    memberMedalId?: string | null;
+  };
 }
 
 const err = (error: string): ActionResult => ({ ok: false, error });
@@ -665,6 +671,7 @@ export async function reportChallenge(
     await addPoints(member.id, challenge.points, source, `Reto cumplido: ${challenge.title}`, challenge.id);
 
     let medal: { name: string; rarity: string; emoji: string } | null = null;
+    let memberMedalId: string | null = null;
     if (challenge.medal_id) {
       const { data: awarded } = await service
         .from("member_medals")
@@ -676,7 +683,10 @@ export async function reportChallenge(
         })
         .select("id")
         .maybeSingle();
-      if (awarded) medal = challenge.medals;
+      if (awarded) {
+        medal = challenge.medals;
+        memberMedalId = awarded.id;
+      }
     }
     await notify(member.id, {
       title: `¡Reto cumplido! ${challenge.title}`,
@@ -685,7 +695,7 @@ export async function reportChallenge(
       href: "/miembros/perfil",
     });
     revalidatePath("/miembros/retos");
-    return { ok: true, completed: { title: challenge.title, points: challenge.points, medal } };
+    return { ok: true, completed: { title: challenge.title, points: challenge.points, medal, memberMedalId } };
   }
 
   revalidatePath("/miembros/retos");

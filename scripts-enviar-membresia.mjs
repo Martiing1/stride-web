@@ -3,7 +3,8 @@
 // Uso desde web/:
 //   node scripts-enviar-membresia.mjs --preview        → solo a Martín
 //   node scripts-enviar-membresia.mjs --dry            → lista, no envía
-//   node scripts-enviar-membresia.mjs --send --limite 100 [--desde 2026-08-01]
+//   node scripts-enviar-membresia.mjs --send --limite 100 [--desde 2026-08-01] [--hasta 2026-09-03]
+//   --hasta por defecto es hoy: excluye a los inscritos a Social Runs que aún no pasan.
 //
 // Escribe solo a leads con marketing_consent, nunca a socios, y de a tandas:
 // el dominio es nuevo y mandar todo de una lo quema.
@@ -22,8 +23,11 @@ const arg = (n, d) => { const i = process.argv.indexOf(n); return i > -1 ? proce
 const MODO = process.argv.includes("--send") ? "send" : process.argv.includes("--preview") ? "preview" : "dry";
 const LIMITE = Number(arg("--limite", 100));
 const DESDE = arg("--desde", null);
+// Tope superior: por defecto hoy, para no escribirle en pasado («cuando apareciste
+// en ese Social Run») a quien se inscribió a un Social Run que todavía no ocurre.
+const HASTA = arg("--hasta", new Date().toISOString().slice(0, 10));
 const FROM = "STRIDE <hola@stridechile.cl>";
-const ASUNTO = "Lo que viene después del Social Run";
+const ASUNTO = "Lo difícil viene después";
 const PREVIEW_TO = "martin.munoz.padilla1@gmail.com";
 
 const firmaBaja = (email) =>
@@ -42,32 +46,44 @@ function html(nombre, email) {
         <tr><td style="padding:36px 36px 8px">
           <h1 style="margin:0 0 14px;font-size:24px;line-height:1.3;color:#171a24">Hola ${nombre} 🖤</h1>
           <p style="margin:0 0 14px;font-size:16px;line-height:1.65;color:#3d4254">
-            Corriste con nosotros en un Social Run hace poco, así que te escribimos a ti primero.
+            Cuando apareciste en ese Social Run probaste algo que no tiene nada que ver con los kilómetros:
+            que sí podías. Nadie te obligó, no había marca que rendir, y fuiste igual.
           </p>
           <p style="margin:0 0 14px;font-size:16px;line-height:1.65;color:#3d4254">
-            Los Social Runs siguen siendo gratis y no cambian. Pero muchos nos dijeron lo mismo después de
-            correr: <em>“me encantó, pero entre domingo y domingo se me desarma”</em>. Para eso armamos
-            <strong>STRIDE ONE</strong>.
+            Lo difícil viene después, cuando no hay nadie esperándote: el agua, el descanso, la comida, leer,
+            moverte sin que sea una pelea contigo. Ahí es donde casi todos partimos con todo y a las pocas
+            semanas ya no queda nada.
+          </p>
+          <p style="margin:0;font-size:17px;line-height:1.6;color:#171a24">
+            <strong>De eso se trata STRIDE ONE.</strong> Correr es la excusa; lo que construimos es la constancia.
           </p>
         </td></tr>
-        <tr><td style="padding:6px 36px 0">
-          <p style="margin:0 0 12px;font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6366f1">Qué es</p>
-          <p style="margin:0 0 9px;font-size:15px;line-height:1.6;color:#3d4254">🏃&nbsp;&nbsp;Un <strong>plan mensual según tu nivel</strong> (5K, 10K o 21K), pensado para semanas reales, no perfectas</p>
-          <p style="margin:0 0 9px;font-size:15px;line-height:1.6;color:#3d4254">🎯&nbsp;&nbsp;<strong>Retos del mes</strong> y hábitos que marcas a diario, para no depender de la motivación</p>
-          <p style="margin:0 0 9px;font-size:15px;line-height:1.6;color:#3d4254">🖤&nbsp;&nbsp;Una <strong>comunidad privada</strong> con sesiones en vivo, donde se premia la constancia y nunca la velocidad</p>
-          <p style="margin:0;font-size:15px;line-height:1.6;color:#3d4254">💳&nbsp;&nbsp;Tu <strong>carnet con beneficios</strong> en cafeterías y tiendas aliadas</p>
+        <tr><td style="padding:22px 36px 0">
+          <p style="margin:0 0 11px;font-size:15px;line-height:1.6;color:#3d4254">
+            🌱&nbsp;&nbsp;<strong style="color:#171a24">Los hábitos los eliges tú</strong> y los marcas cada día.
+          </p>
+          <p style="margin:0 0 11px;font-size:15px;line-height:1.6;color:#3d4254">
+            🎯&nbsp;&nbsp;<strong style="color:#171a24">Cada mes tiene un foco</strong>, con su reto y club de lectura.
+          </p>
+          <p style="margin:0;font-size:15px;line-height:1.6;color:#3d4254">
+            🖤&nbsp;&nbsp;<strong style="color:#171a24">No lo haces solo</strong>: comunidad y sesiones en vivo, donde
+            se premia la constancia y nunca la velocidad.
+          </p>
         </td></tr>
-        <tr><td style="padding:24px 36px 4px">
-          <p style="margin:0;font-size:16px;line-height:1.6;color:#171a24"><strong>$31.990 al mes, sin permanencia.</strong> Puedes probar un mes y decidir.</p>
+        <tr><td style="padding:22px 36px 4px">
+          <p style="margin:0 0 10px;font-size:16px;line-height:1.6;color:#171a24"><strong>$31.990 al mes, sin permanencia.</strong> Pruebas un mes y decides.</p>
+          <p style="margin:0;font-size:15px;line-height:1.6;color:#3d4254">
+            ¿Tienes dudas o quieres saber si te calza? <strong>Respóndeme este correo</strong> y te cuento; lo
+            leemos nosotros, no un robot.
+          </p>
         </td></tr>
         <tr><td align="center" style="padding:18px 36px 10px">
           <a href="https://stridechile.cl/one" style="display:inline-block;background:#7C3AED;color:#ffffff;padding:15px 34px;border-radius:999px;text-decoration:none;font-weight:700;font-size:16px">Ver de qué se trata</a>
         </td></tr>
         <tr><td style="padding:22px 36px 32px">
           <p style="margin:0;padding-top:18px;border-top:1px solid #e8eaf2;font-size:12.5px;line-height:1.6;color:#9aa1b5">
-            Te escribimos porque te inscribiste en un Social Run de STRIDE. Si prefieres no recibir estos correos,
-            <a href="${baja}" style="color:#6a7186;text-decoration:underline">te sacamos de la lista en un click</a>
-            y no te molestamos más. Nos vemos igual el próximo domingo 🙌
+            Te escribimos porque corriste en un Social Run de STRIDE. Los Social Runs siguen siendo gratis.
+            Si no quieres estos correos, <a href="${baja}" style="color:#6a7186;text-decoration:underline">te sacamos en un click</a>.
           </p>
         </td></tr>
       </table>
@@ -95,6 +111,7 @@ let q = supa.from("leads").select("full_name, email, consented_at, temperature")
   .eq("marketing_consent", true).eq("source", "evently").eq("status", "nuevo")
   .order("consented_at", { ascending: false });
 if (DESDE) q = q.gte("consented_at", DESDE);
+if (HASTA) q = q.lte("consented_at", `${HASTA}T23:59:59`);
 const { data: leads } = await q;
 
 const { data: miembros } = await supa.from("members").select("email");
@@ -102,7 +119,7 @@ const socios = new Set((miembros ?? []).map((m) => (m.email || "").toLowerCase()
 const destino = (leads ?? []).filter((l) => l.email && !socios.has(l.email.toLowerCase())).slice(0, LIMITE);
 
 if (MODO === "dry") {
-  console.log(`[DRY] ${destino.length} destinatarios (tope ${LIMITE}${DESDE ? `, desde ${DESDE}` : ""}), nada enviado.`);
+  console.log(`[DRY] ${destino.length} destinatarios (tope ${LIMITE}${DESDE ? `, desde ${DESDE}` : ""}, hasta ${HASTA}), nada enviado.`);
   for (const d of destino.slice(0, 5)) console.log(`   ${(d.full_name||"").slice(0,24).padEnd(24)} ${d.email}  ${(d.consented_at||"").slice(0,10)}`);
   if (destino.length > 5) console.log(`   … y ${destino.length - 5} más`);
 } else {
