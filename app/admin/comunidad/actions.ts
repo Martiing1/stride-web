@@ -149,22 +149,48 @@ export async function resolvePause(pauseId: string, approve: boolean): Promise<A
   return { ok: true };
 }
 
-// ─── Import de asistencia (CSV de Evently) ───────────────────────────────────
+// ─── Import de asistencia (export de Evently) ────────────────────────────────
 
 /**
- * Recibe el CSV exportado de Evently, calza asistentes por email con los
- * miembros y registra la asistencia. A cada miembro calzado le paga los
- * puntos de Social Run (una sola vez por evento) y le avisa por la campana.
- * Las filas sin match quedan guardadas con nombre/email para revisarlas.
+ * Calza asistentes por email con los miembros y registra la asistencia. A cada
+ * miembro calzado le paga los puntos del evento (una sola vez) y le avisa por
+ * la campana; las filas sin match quedan guardadas para revisarlas.
+ *
+ * Acepta el .xlsx tal cual lo baja Evently (columnas ID, CI, Nombre, Apellido,
+ * Email, …, Fecha de Validación) o filas pegadas/subidas como CSV. En el .xlsx
+ * la "Fecha de Validación" es el check-in en la puerta: por defecto solo esos
+ * inscritos reciben puntos, porque comprar ticket no es haber ido.
  */
 export async function importEventlyCsv(formData: FormData): Promise<AdminResult> {
   const staff = await requireTeamMember(["socio", "lider_comunidad"]);
   const service = createServiceClient();
 
   const eventId = String(formData.get("event_id") ?? "");
-  const csvText = String(formData.get("csv") ?? "").trim();
   if (!eventId) return err("Elige el evento.");
-  if (!csvText) return err("Pega o sube el CSV de Evently.");
+
+  const file = formData.get("file");
+  const csvText = String(formData.get("csv") ?? "").trim();
+  const onlyValidated = String(formData.get("only_validated") ?? "si") !== "no";
+
+  let rows: string[][];
+  if (file instanceof File && file.size > 0) {
+    if (file.size > 4 * 1024 * 1024) return err("El archivo pesa más de 4 MB; no parece un export de Evently.");
+    const buffer = Buffer.from(await file.arrayBuffer());
+    if (buffer.subarray(0, 2).toString("latin1") === "PK") {
+      const { readXlsxRows } = await import("@/lib/xlsx-lite");
+      try {
+        rows = readXlsxRows(buffer);
+      } catch {
+        return err("No pudimos leer el .xlsx. Exporta de nuevo desde Evently sin abrirlo en Excel.");
+      }
+    } else {
+      rows = parseCsv(buffer.toString("utf8"));
+    }
+  } else if (csvText) {
+    rows = parseCsv(csvText);
+  } else {
+    return err("Sube el export de Evently (.xlsx o .csv) o pega las filas.");
+  }
 
   const { data: event } = await service
     .from("events")
@@ -173,14 +199,25 @@ export async function importEventlyCsv(formData: FormData): Promise<AdminResult>
     .maybeSingle();
   if (!event) return err("Ese evento no existe.");
 
-  // Parser CSV simple con soporte de comillas (suficiente para Evently).
-  const rows = parseCsv(csvText);
-  if (rows.length < 2) return err("El CSV no trae filas de asistentes.");
+  if (rows.length < 2) return err("El archivo no trae filas de asistentes.");
 
-  const header = rows[0].map((cell) => cell.toLowerCase());
-  const emailIdx = header.findIndex((cell) => cell.includes("mail"));
-  const nameIdx = header.findIndex((cell) => cell.includes("nombre") || cell.includes("name"));
-  if (emailIdx === -1) return err("No encontramos la columna de email en el CSV.");
+  const header = rows[0].map(normalizeHeader);
+  const column = (...needles: string[]) => header.findIndex((cell) => needles.some((needle) => cell.includes(needle)));
+  const emailIdx = column("mail");
+  const nameIdx = column("nombre", "name");
+  const lastNameIdx = column("apellido");
+  const validatedIdx = column("validacion");
+  if (emailIdx === -1) return err("No encontramos la columna de email en el archivo.");
+
+  const allRows = rows.slice(1);
+  const validated = validatedIdx >= 0 ? allRows.filter((row) => (row[validatedIdx] ?? "").trim() !== "") : allRows;
+  const skipped = allRows.length - validated.length;
+  if (onlyValidated && validatedIdx >= 0 && validated.length === 0) {
+    return err(
+      "Ninguna fila trae «Fecha de Validación»: nadie quedó validado en la puerta. Desmarca «solo los validados» si quieres acreditar a todos los inscritos."
+    );
+  }
+  const attendees = onlyValidated ? validated : allRows;
 
   const { data: members } = await service.from("members").select("id, email, full_name");
   const byEmail = new Map(
@@ -195,10 +232,14 @@ export async function importEventlyCsv(formData: FormData): Promise<AdminResult>
   let unmatched = 0;
   let duplicated = 0;
 
-  for (const row of rows.slice(1)) {
+  for (const row of attendees) {
     const email = (row[emailIdx] ?? "").trim().toLowerCase();
     if (!email) continue;
-    const name = nameIdx >= 0 ? (row[nameIdx] ?? "").trim() : "";
+    const name = [nameIdx, lastNameIdx]
+      .filter((idx) => idx >= 0)
+      .map((idx) => (row[idx] ?? "").trim())
+      .filter(Boolean)
+      .join(" ");
     const member = byEmail.get(email);
 
     const { error } = await service.from("event_attendance").insert({
@@ -235,10 +276,16 @@ export async function importEventlyCsv(formData: FormData): Promise<AdminResult>
   }
 
   revalidatePath("/admin/comunidad");
+  const ignored = onlyValidated && skipped > 0 ? ` · ${skipped} inscritos sin validar en puerta (no se acreditan)` : "";
   return {
     ok: true,
-    summary: `${matched} miembros acreditados · ${unmatched} sin match (guardados para revisar) · ${duplicated} ya estaban`,
+    summary: `${matched} miembros acreditados · ${unmatched} sin match (guardados para revisar) · ${duplicated} ya estaban${ignored}`,
   };
+}
+
+/** Encabezado comparable: sin mayúsculas ni tildes. */
+function normalizeHeader(value: string): string {
+  return value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 }
 
 function parseCsv(text: string): string[][] {
