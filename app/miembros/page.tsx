@@ -33,7 +33,7 @@ export default async function BlogPage({
 
   const [habits, feedRaw, events, ranking, challenges] = await Promise.all([
     member ? getHabitsToday(member.id) : Promise.resolve(null),
-    getFeed(memberId, "all"),
+    getFeed(memberId, "all", member ? null : staff?.id ?? null),
     getMemberEvents(memberId),
     getMonthlyRanking(memberId ?? "sin-miembro"),
     member ? getChallenges(member.id) : Promise.resolve([]),
@@ -86,7 +86,7 @@ export default async function BlogPage({
           posts={feed}
           emptyHint={query ? "Prueba con otra palabra." : "Comparte tu primer entrenamiento y parte la conversación."}
           adminView={Boolean(staff)}
-          canLike={Boolean(member)}
+          canLike={Boolean(member || staff)}
         />
       </div>
 

@@ -136,14 +136,17 @@ export async function createPost(formData: FormData): Promise<ActionResult> {
 
 export async function toggleLike(postId: string): Promise<ActionResult> {
   const member = await getCurrentMember();
-  if (!member) return err("Tu sesión venció.");
+  const staff = member ? null : await getCommunityStaff();
+  if (!member && !staff) return err("Tu sesión venció.");
   const service = createServiceClient();
+  // El like es del miembro o, si entra alguien del equipo sin ficha, de su team_member (migración 021).
+  const liker = member ? { column: "member_id", id: member.id } : { column: "team_member_id", id: staff!.id };
 
   const { data: existing } = await service
     .from("community_likes")
     .select("post_id")
     .eq("post_id", postId)
-    .eq("member_id", member.id)
+    .eq(liker.column, liker.id)
     .maybeSingle();
 
   const { data: post } = await service
@@ -154,16 +157,16 @@ export async function toggleLike(postId: string): Promise<ActionResult> {
   const weights = await getPointsWeights();
 
   if (existing) {
-    await service.from("community_likes").delete().eq("post_id", postId).eq("member_id", member.id);
+    await service.from("community_likes").delete().eq("post_id", postId).eq(liker.column, liker.id);
     // Farming-proof: el unlike descuenta lo que el like pagó.
-    if (post?.author_member_id && post.author_member_id !== member.id)
+    if (post?.author_member_id && post.author_member_id !== member?.id)
       await addPoints(post.author_member_id, -weights.like_received, "like_received", "Like retirado");
   } else {
     const { error } = await service
       .from("community_likes")
-      .insert({ post_id: postId, member_id: member.id });
+      .insert({ post_id: postId, [liker.column]: liker.id });
     if (error) return err("No pudimos guardar tu like.");
-    if (post?.author_member_id && post.author_member_id !== member.id)
+    if (post?.author_member_id && post.author_member_id !== member?.id)
       await addPoints(post.author_member_id, weights.like_received, "like_received", "Like recibido");
   }
   revalidatePath("/miembros");

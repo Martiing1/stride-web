@@ -263,7 +263,11 @@ function authorPhotoUrl(
   return null;
 }
 
-export async function getFeed(myMemberId: string | null, channel?: Channel | "all"): Promise<FeedPost[]> {
+export async function getFeed(
+  myMemberId: string | null,
+  channel?: Channel | "all",
+  myTeamMemberId: string | null = null
+): Promise<FeedPost[]> {
   const service = createServiceClient();
 
   let query = service
@@ -282,8 +286,8 @@ export async function getFeed(myMemberId: string | null, channel?: Channel | "al
   const ids = posts.map((p) => p.id);
   const [likes, comments, medals, events, distinguidos] = await Promise.all([
     safeQuery(
-      () => service.from("community_likes").select("post_id, member_id").in("post_id", ids),
-      [] as Array<{ post_id: string; member_id: string }>
+      () => service.from("community_likes").select("post_id, member_id, team_member_id").in("post_id", ids),
+      [] as Array<{ post_id: string; member_id: string | null; team_member_id: string | null }>
     ),
     (async () => {
       type RawComment = { id: string; post_id: string; parent_id: string | null; body: string; created_at: string; author_member_id: string | null; members: { full_name: string; display_name: string | null; photo_path: string | null } | null; team_members: { full_name: string; nickname: string | null; photo_path: string | null } | null };
@@ -335,7 +339,8 @@ export async function getFeed(myMemberId: string | null, channel?: Channel | "al
   for (const like of likes) {
     const entry = likesByPost.get(like.post_id) ?? { count: 0, mine: false };
     entry.count += 1;
-    if (like.member_id === myMemberId) entry.mine = true;
+    if ((myMemberId && like.member_id === myMemberId) || (myTeamMemberId && like.team_member_id === myTeamMemberId))
+      entry.mine = true;
     likesByPost.set(like.post_id, entry);
   }
   const commentsByPost = new Map<string, FeedComment[]>();
