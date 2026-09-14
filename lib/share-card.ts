@@ -15,20 +15,17 @@
  * sobre negro. Sin emojis, sin cápsulas, sin degradados de fondo. La única
  * concesión al premio: la cifra de la medalla va en oro, plata o bronce.
  *
- * Tres formatos:
+ * Formatos que ofrece la app (2026-09-14, Martín sacó la publicación):
  *  - `story`   1080x1920, para la historia.
- *  - `post`    1080x1350, para el feed.
  *  - `sticker` PNG con fondo TRANSPARENTE y alto variable: el mismo bloque
- *              suelto, para pegarlo encima del video propio con el sticker
- *              de foto de Instagram.
+ *              suelto, para copiarlo y pegarlo encima del video propio.
+ * `post` (1080x1350) sigue dibujándose si alguien lo pide, pero no se ofrece.
  *
  * Guardrail de marca: acá NUNCA se muestran ritmo ni velocidad. Las cifras son
  * de constancia y participación (avance, puntos, medallas).
  *
  * Solo cliente: usa canvas, document.fonts y URL.createObjectURL.
  */
-
-import { SITE } from "@/lib/site";
 
 export type ShareFormat = "story" | "post" | "sticker";
 export type MedalRarity = "oro" | "plata" | "bronce";
@@ -54,9 +51,8 @@ export interface ShareCardData {
 }
 
 export const SHARE_FORMATS: Array<{ id: ShareFormat; label: string; hint: string }> = [
-  { id: "story", label: "Historia", hint: "9:16 · pantalla completa" },
-  { id: "post", label: "Publicación", hint: "4:5 · para el feed" },
-  { id: "sticker", label: "Sticker", hint: "PNG transparente · sobre tu video" },
+  { id: "story", label: "Historia", hint: "Pantalla completa" },
+  { id: "sticker", label: "Sticker", hint: "Para pegar sobre tu video" },
 ];
 
 const INK = "#0A0A0A";
@@ -411,28 +407,6 @@ export async function renderShareCard(data: ShareCardData, format: ShareFormat):
   return new File([blob], `stride-${format}.${type === "image/png" ? "png" : "jpg"}`, { type });
 }
 
-/** @usuario de Instagram, derivado del link oficial en lib/site.ts. */
-function instagramHandle(): string {
-  const slug = SITE.instagram.replace(/\/+$/, "").split("/").pop();
-  return slug ? `@${slug}` : "@stridechile";
-}
-
-/** Texto sugerido para pegar en el pie de la publicación. */
-export function shareCaption(data: ShareCardData, handle = instagramHandle()): string {
-  const stats = data.stats
-    .slice(0, 3)
-    .map((s) => `${s.label} ${s.value}`)
-    .join(" · ");
-  return [
-    `${data.headline ? `${data.headline}: ` : ""}«${data.title}»`,
-    stats,
-    `Entrenando con ${handle} en STRIDE ONE. Correr es la excusa para socializar.`,
-    "#StrideOne #Stride #Concepción #Running #Comunidad #Constancia",
-  ]
-    .filter(Boolean)
-    .join("\n\n");
-}
-
 /** Si el navegador puede mandar archivos al share sheet del sistema. */
 export function canShareFiles(file?: File | null): boolean {
   if (typeof navigator === "undefined" || !navigator.canShare || !navigator.share) return false;
@@ -454,4 +428,70 @@ export function unitLabel(unit: string | null | undefined, fallback = "Avance"):
   else if (/[sx]$/.test(u)) plural = u;
   else plural = `${u}es`;
   return plural.charAt(0).toUpperCase() + plural.slice(1);
+}
+
+// ─── Mandar a Instagram ──────────────────────────────────────────────────────
+//
+// Strava abre la historia de Instagram con la imagen ya puesta porque es una
+// app nativa con App ID de Meta. Una web no puede: ni el pasteboard especial
+// de iOS ni el intent de Android aceptan archivos desde el navegador. Lo más
+// cerca que se llega es esto: la historia sale en UN toque hacia el menú del
+// teléfono (donde está Instagram), y el sticker se copia en un toque y se
+// abre la cámara de historias en otro, lista para pegarlo.
+
+/** iPhone o iPad (el iPad moderno dice "Macintosh" pero tiene pantalla táctil). */
+export function isIOS(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /iPhone|iPad|iPod/i.test(navigator.userAgent) || (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+}
+
+/** Celular o tablet: donde está instalado Instagram. */
+export function isMobile(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return isIOS() || /Android/i.test(navigator.userAgent);
+}
+
+/** Si el navegador deja copiar una imagen al portapapeles. */
+export function canCopyImage(): boolean {
+  return typeof window !== "undefined" && "ClipboardItem" in window && !!navigator.clipboard?.write;
+}
+
+/**
+ * Copia el PNG al portapapeles. Llamar directo desde el toque: Safari exige
+ * que la escritura salga del gesto, por eso el archivo ya tiene que existir.
+ */
+export async function copyImageToClipboard(file: File): Promise<boolean> {
+  if (!canCopyImage()) return false;
+  try {
+    await navigator.clipboard.write([new ClipboardItem({ [file.type]: file })]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Abre la cámara de historias de Instagram (si la app está instalada). */
+export function openInstagramStoryCamera(): void {
+  window.location.href = /Android/i.test(navigator.userAgent)
+    ? "intent://story-camera#Intent;package=com.instagram.android;scheme=instagram;end"
+    : "instagram://story-camera";
+}
+
+/**
+ * Guarda la imagen. En iPhone el único camino a Fotos es el menú de compartir
+ * ("Guardar imagen"); en Android y computador se descarga.
+ */
+export async function saveImage(file: File): Promise<void> {
+  if (isIOS() && canShareFiles(file)) {
+    await navigator.share({ files: [file] });
+    return;
+  }
+  const url = URL.createObjectURL(file);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = file.name;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 4000);
 }

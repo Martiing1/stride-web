@@ -152,7 +152,7 @@ export function ChallengeCelebration({
           +{completed.points} pts{completed.medal ? " · ya brilla en tu vitrina" : ""}
         </p>
 
-        <ShareButton data={share} label="Compartir en Instagram" variant="primary" className="mt-6 w-full" />
+        <ShareButton data={share} label="Compartir" variant="hero" className="mt-6" />
         <button
           type="button"
           onClick={publish}

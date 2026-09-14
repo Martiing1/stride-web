@@ -10,6 +10,7 @@ import clsx from "clsx";
 import { createPost, reportTraining, uploadEvidence } from "@/app/miembros/community-actions";
 import { ShareButton } from "@/components/community/ShareCardModal";
 import { ChallengeCelebration, type Completed } from "@/components/community/ChallengeCelebration";
+import { RegisteredSheet } from "@/components/community/RegisteredSheet";
 import { RARITY_LABEL, asRarity } from "@/components/community/MedalBadge";
 import { unitLabel, type ShareCardData, type ShareStat } from "@/lib/share-card";
 import type { ChallengeView } from "@/lib/community";
@@ -22,6 +23,8 @@ export function ChallengeCard({ challenge, highlight }: { challenge: ChallengeVi
   /** Segundo paso del popup: escribir el post antes de publicarlo. */
   const [blogDraft, setBlogDraft] = useState<string | null>(null);
   const [wow, setWow] = useState<Completed | null>(null);
+  /** Confirmación de un registro que no cumple el reto: trae el botón grande de compartir. */
+  const [logged, setLogged] = useState<{ title: string; detail: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const reportFileRef = useRef<HTMLInputElement>(null);
@@ -59,6 +62,7 @@ export function ChallengeCard({ challenge, highlight }: { challenge: ChallengeVi
     const formData = new FormData();
     formData.set("challengeId", challenge.id);
     const evidenceFile = reportFile;
+    const nextCount = Math.min(state.count + 1, state.goal);
     setState((s) => ({ ...s, count: Math.min(s.count + 1, s.goal) }));
     setReportOpen(false);
     setReportFile(null);
@@ -73,6 +77,11 @@ export function ChallengeCard({ challenge, highlight }: { challenge: ChallengeVi
       if (result.completed) {
         setState((s) => ({ ...s, status: "cumplido" }));
         setWow(result.completed);
+      } else {
+        setLogged({
+          title: "¡Registrado!",
+          detail: `Llevas ${nextCount} de ${state.goal}${state.unit ? ` ${unitLabel(state.unit).toLowerCase()}` : ""}. Muéstralo.`,
+        });
       }
       router.refresh();
     });
@@ -130,6 +139,9 @@ export function ChallengeCard({ challenge, highlight }: { challenge: ChallengeVi
         return;
       }
       setState((s) => ({ ...s, status: "en_verificacion" }));
+      setReportOpen(false);
+      setReportFile(null);
+      setLogged({ title: "¡Evidencia enviada!", detail: "El equipo la revisa y te avisa. Mientras, cuéntalo." });
       router.refresh();
     });
   };
@@ -328,6 +340,9 @@ export function ChallengeCard({ challenge, highlight }: { challenge: ChallengeVi
       )}
 
       {wow && <ChallengeCelebration completed={wow} share={shareData()} onClose={() => setWow(null)} />}
+      {logged && !wow && (
+        <RegisteredSheet title={logged.title} detail={logged.detail} share={shareData()} onClose={() => setLogged(null)} />
+      )}
     </>
   );
 }

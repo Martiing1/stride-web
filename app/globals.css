@@ -347,6 +347,22 @@ html[data-admin-theme="light"] .text-stride-indigo { color: #4f46e5; }
   background-position: 0 0, 0 10px, 10px -10px, -10px 0;
 }
 
+/*
+ * El botón grande para mandar a Instagram (historia y "abrir mi historia").
+ * Degradado de marca en sus tonos oscuros: los extremos claros (#00E5FF) no
+ * dan contraste con texto blanco.
+ */
+.instagram-cta {
+  background-image: linear-gradient(95deg, #0891b2 0%, #4f46e5 52%, #7c3aed 100%);
+  box-shadow: 0 10px 30px -12px rgba(124, 58, 237, 0.65);
+}
+.instagram-cta:hover {
+  filter: brightness(1.08);
+}
+.instagram-cta:active {
+  transform: scale(0.99);
+}
+
 /* La medalla entra al popup con un rebote: escala desde chico y se asienta. */
 @keyframes medal-pop {
   0% {
