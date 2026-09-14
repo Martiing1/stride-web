@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState, useTransition, type FormEvent } from "react";
+import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   File as FileIcon, FileImage, FileSpreadsheet, FileText, FileVideo, Folder, FolderPlus,
-  Loader2, Upload, ExternalLink, ChevronRight, HardDrive,
+  ExternalLink, ChevronRight, HardDrive,
 } from "lucide-react";
-import { createDriveFolder, uploadDocument } from "@/app/admin/documentos/actions";
+import { createDriveFolder } from "@/app/admin/documentos/actions";
+import { DriveUploader, formatSize } from "@/components/admin/DriveUploader";
 import type { DriveFile } from "@/lib/google-drive";
 
 function iconFor(file: DriveFile) {
@@ -18,13 +19,6 @@ function iconFor(file: DriveFile) {
   if (m.includes("spreadsheet") || m.includes("excel") || m.includes("csv")) return FileSpreadsheet;
   if (m.includes("document") || m.includes("pdf") || m.includes("text")) return FileText;
   return FileIcon;
-}
-
-function formatSize(bytes: number | null): string {
-  if (bytes == null) return "";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
 /** Explorador del Drive TEAM STRIDE dentro del ERP. */
@@ -40,23 +34,9 @@ export function DocumentsBrowser({
   canCreateFolders: boolean;
 }) {
   const router = useRouter();
-  const fileRef = useRef<HTMLInputElement>(null);
   const [creating, setCreating] = useState(false);
-  const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-
-  function upload(file: File) {
-    const form = new FormData();
-    form.set("folder_id", folderId);
-    form.set("file", file);
-    setMessage(null);
-    startTransition(async () => {
-      const result = await uploadDocument(form);
-      setMessage(result.ok ? { tone: "ok", text: `«${file.name}» subido a Drive.` } : { tone: "error", text: result.error ?? "Error" });
-      if (fileRef.current) fileRef.current.value = "";
-      router.refresh();
-    });
-  }
 
   function newFolder(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -66,7 +46,7 @@ export function DocumentsBrowser({
     startTransition(async () => {
       const result = await createDriveFolder(form);
       if (result.ok) setCreating(false);
-      else setMessage({ tone: "error", text: result.error ?? "Error" });
+      else setMessage(result.error ?? "Error");
       router.refresh();
     });
   }
@@ -89,17 +69,11 @@ export function DocumentsBrowser({
           ))}
         </nav>
 
-        <div className="flex gap-2">
-          {canCreateFolders && !creating && (
-            <button type="button" onClick={() => setCreating(true)} className="inline-flex items-center gap-1.5 rounded-full border border-white/15 px-4 py-2 text-sm text-white/70 hover:text-white">
-              <FolderPlus className="h-4 w-4" /> Carpeta
-            </button>
-          )}
-          <button type="button" onClick={() => fileRef.current?.click()} disabled={pending} className="btn-primary px-5 py-2 text-sm">
-            {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Upload className="h-4 w-4" /> Subir archivo</>}
+        {canCreateFolders && !creating && (
+          <button type="button" onClick={() => setCreating(true)} className="inline-flex items-center gap-1.5 rounded-full border border-white/15 px-4 py-2 text-sm text-white/70 hover:text-white">
+            <FolderPlus className="h-4 w-4" /> Carpeta
           </button>
-          <input ref={fileRef} type="file" className="hidden" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} />
-        </div>
+        )}
       </div>
 
       {creating && (
@@ -114,16 +88,17 @@ export function DocumentsBrowser({
       )}
 
       {message && (
-        <p className={`rounded-xl border p-3 text-sm ${message.tone === "ok" ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200" : "border-red-400/30 bg-red-500/10 text-red-200"}`}>
-          {message.text}
-        </p>
+        <p className="rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-200">{message}</p>
       )}
+
+      {/* Subida masiva a la carpeta abierta */}
+      <DriveUploader folderId={folderId} onUploaded={() => router.refresh()} />
 
       {/* Listado */}
       {files.length === 0 ? (
         <div className="card flex flex-col items-center gap-3 py-14 text-center">
           <Folder className="h-10 w-10 text-white/25" />
-          <p className="text-sm text-white/50">Carpeta vacía. Sube el primer archivo.</p>
+          <p className="text-sm text-white/50">Carpeta vacía. Sube los primeros archivos.</p>
         </div>
       ) : (
         <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
