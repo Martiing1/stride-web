@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { Search } from "lucide-react";
 import { getCurrentMember, getCommunityStaff, getSignedMemberPhoto, getSignedStaffPhoto } from "@/lib/member-auth";
-import { getNotifications } from "@/lib/community";
+import { getNotifications, getPendingReviewCount } from "@/lib/community";
 import { MemberTabs } from "@/components/community/MemberTabs";
 import { BellButton } from "@/components/community/BellButton";
 import { AdminBar } from "@/components/community/AdminBar";
@@ -28,13 +28,15 @@ export default async function MemberLayout({ children }: { children: React.React
   const [member, staff] = await Promise.all([getCurrentMember(), getCommunityStaff()]);
   if (!member && !staff) redirect("/miembros/ingresar");
 
-  const [photoUrl, notifications] = await Promise.all([
+  const [photoUrl, notifications, pendingReviews] = await Promise.all([
     // La foto del equipo vive en otro bucket. Si además es miembro y no subió
     // foto propia, se usa la del ERP para no dejarlo con iniciales.
     member
       ? getSignedMemberPhoto(member).then((url) => url ?? getSignedStaffPhoto(staff?.photo_path))
       : getSignedStaffPhoto(staff?.photo_path),
     member ? getNotifications(member.id) : Promise.resolve({ items: [], unread: 0 }),
+    // Contador de la cola de verificación en la barra del staff.
+    staff ? getPendingReviewCount() : Promise.resolve(0),
   ]);
 
   const displayName = member ? memberDisplayName(member) : staff!.nickname ?? staff!.full_name;
@@ -91,7 +93,7 @@ export default async function MemberLayout({ children }: { children: React.React
         </div>
       </header>
 
-      {staff && <AdminBar name={staff.nickname ?? staff.full_name.split(" ")[0]} />}
+      {staff && <AdminBar name={staff.nickname ?? staff.full_name.split(" ")[0]} pending={pendingReviews} />}
 
       <main className="mx-auto w-full max-w-5xl px-4 py-5 pb-24 sm:px-6">{children}</main>
 

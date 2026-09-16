@@ -4,9 +4,10 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { createServiceClient } from "@/lib/supabase/server";
 import { getCurrentMember, getCommunityStaff } from "@/lib/member-auth";
-import { todayInChile } from "@/lib/membership";
+import { NO_WEEK, todayInChile, weekStartChile } from "@/lib/membership";
 import { addPoints, getPointsWeights, notify, MAX_HABITS, DEFAULT_POINTS, memberDisplayName, type Channel, type PointsWeights } from "@/lib/community";
 import { detectImage, detectVideo } from "@/lib/uploads";
+import { notifyStaffReview } from "@/lib/resend";
 
 /**
  * Acciones de la comunidad (lado miembro). Todas parten igual: se resuelve el
@@ -78,7 +79,7 @@ export async function createPost(formData: FormData): Promise<ActionResult> {
   if (challengeId) {
     const { data: challenge } = await service
       .from("challenges")
-      .select("id, criterio, title")
+      .select("id, criterio, title, period")
       .eq("id", challengeId)
       .eq("active", true)
       .maybeSingle();
@@ -112,12 +113,14 @@ export async function createPost(formData: FormData): Promise<ActionResult> {
             {
               challenge_id: challengeId,
               member_id: member.id,
+              week_start: challenge.period === "semana" ? weekStartChile() : NO_WEEK,
               evidence_path: evidencePath,
               status: "en_verificacion",
               updated_at: new Date().toISOString(),
             },
-            { onConflict: "challenge_id,member_id" }
+            { onConflict: "challenge_id,member_id,week_start" }
           );
+          await notifyStaffReview({ kind: "reto", memberName: memberDisplayName(member), title: challenge.title });
           revalidatePath("/miembros");
           return { ok: true, info: `Tu foto quedó como evidencia de «${challenge.title}» — el staff la revisa ✓` };
         }
@@ -566,6 +569,7 @@ export async function requestPause(note: string): Promise<ActionResult> {
     .from("pause_requests")
     .insert({ member_id: member.id, note: text, start_date: todayInChile() });
   if (error) return err("No pudimos enviar la solicitud.");
+  await notifyStaffReview({ kind: "pausa", memberName: memberDisplayName(member), title: text.slice(0, 80) });
   revalidatePath("/miembros/perfil");
   return { ok: true };
 }
@@ -636,11 +640,13 @@ export async function reportChallenge(
   if (!challenge) return err("Ese reto ya no está activo.");
   if (challenge.criterio !== "cantidad") return err("Este reto no se avanza con el botón.");
 
+  // Los micro-retos se avanzan en la semana en curso (se reinician cada lunes).
+  const weekStart = challenge.period === "semana" ? weekStartChile() : NO_WEEK;
   const { data: progress } = await service
     .from("challenge_progress")
     .upsert(
-      { challenge_id: challengeId, member_id: member.id },
-      { onConflict: "challenge_id,member_id", ignoreDuplicates: true }
+      { challenge_id: challengeId, member_id: member.id, week_start: weekStart },
+      { onConflict: "challenge_id,member_id,week_start", ignoreDuplicates: true }
     )
     .select("id, count, status")
     .maybeSingle();
@@ -652,6 +658,7 @@ export async function reportChallenge(
         .select("id, count, status")
         .eq("challenge_id", challengeId)
         .eq("member_id", member.id)
+        .eq("week_start", weekStart)
         .single();
   if (!row) return err("No pudimos registrar tu avance.");
   if (row.status === "cumplido") return err("¡Este reto ya lo cumpliste!");
@@ -671,7 +678,8 @@ export async function reportChallenge(
   if (completed) {
     const source =
       challenge.period === "mes" ? "reto_mes" : challenge.period === "semana" ? "micro_reto" : "reto_general";
-    await addPoints(member.id, challenge.points, source, `Reto cumplido: ${challenge.title}`, challenge.id);
+    // Un micro-reto se paga cada semana: el candado anti-duplicados apunta a la fila semanal.
+    await addPoints(member.id, challenge.points, source, `Reto cumplido: ${challenge.title}`, challenge.period === "semana" ? row.id : challenge.id);
 
     let medal: { name: string; rarity: string; emoji: string } | null = null;
     let memberMedalId: string | null = null;
@@ -716,7 +724,7 @@ export async function uploadEvidence(formData: FormData): Promise<ActionResult> 
   const service = createServiceClient();
   const { data: challenge } = await service
     .from("challenges")
-    .select("id, criterio")
+    .select("id, criterio, period, title")
     .eq("id", challengeId)
     .eq("active", true)
     .maybeSingle();
@@ -736,13 +744,15 @@ export async function uploadEvidence(formData: FormData): Promise<ActionResult> 
     {
       challenge_id: challengeId,
       member_id: member.id,
+      week_start: challenge.period === "semana" ? weekStartChile() : NO_WEEK,
       evidence_path: path,
       status: "en_verificacion",
       updated_at: new Date().toISOString(),
     },
-    { onConflict: "challenge_id,member_id" }
+    { onConflict: "challenge_id,member_id,week_start" }
   );
   if (error) return err("No pudimos registrar la evidencia.");
+  await notifyStaffReview({ kind: "reto", memberName: memberDisplayName(member), title: challenge.title });
   revalidatePath("/miembros/retos");
   return { ok: true };
 }
@@ -777,6 +787,7 @@ export async function uploadPhysicalMedal(formData: FormData): Promise<ActionRes
     status: "en_revision",
   });
   if (error) return err("No pudimos registrar la medalla.");
+  await notifyStaffReview({ kind: "medalla", memberName: memberDisplayName(member), title: title.slice(0, 80) });
   revalidatePath("/miembros/perfil");
   return { ok: true };
 }

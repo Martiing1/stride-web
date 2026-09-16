@@ -3,10 +3,18 @@ import { getChallenges, getChallengesAdmin, getMedalOptions, getMonthlyRanking }
 import { ChallengeCard } from "@/components/community/ChallengeCard";
 import { HitoTile } from "@/components/community/HitoTile";
 import { ChallengeAdminPanel } from "@/components/community/ChallengeAdminPanel";
+import { addDaysIso, weekStartChile } from "@/lib/membership";
 
 export const dynamic = "force-dynamic";
 
 const MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+
+/** "14 al 20 de septiembre" o "31 de agosto al 6 de septiembre". */
+function formatRange(from: string, to: string): string {
+  const [, fm, fd] = from.split("-").map(Number);
+  const [, tm, td] = to.split("-").map(Number);
+  return fm === tm ? `${fd} al ${td} de ${MONTHS[tm - 1]}` : `${fd} de ${MONTHS[fm - 1]} al ${td} de ${MONTHS[tm - 1]}`;
+}
 
 /** Retos: del mes, micro-retos, generales e hitos permanentes. */
 export default async function RetosPage() {
@@ -24,6 +32,9 @@ export default async function RetosPage() {
   const generales = challenges.filter((c) => c.period === "general");
   const hitos = challenges.filter((c) => c.period === "hito");
   const monthName = MONTHS[new Date().getMonth()];
+  // Micro-retos: semana en curso (lunes a domingo, hora Chile); se reinician cada lunes.
+  const weekStart = weekStartChile();
+  const weekLabel = formatRange(weekStart, addDaysIso(weekStart, 6));
 
   return (
     <div className="mx-auto max-w-2xl space-y-5">
@@ -56,9 +67,12 @@ export default async function RetosPage() {
 
       {micro.length > 0 && (
         <section className="space-y-3">
-          <h2 className="px-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--sdim)]">
-            Micro-retos de la semana
-          </h2>
+          <div className="px-1">
+            <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--sdim)]">
+              Micro-retos de la semana · {weekLabel}
+            </h2>
+            <p className="mt-0.5 text-[11px] text-[var(--sdim)]">Se reinician cada lunes.</p>
+          </div>
           {micro.map((challenge) => (
             <ChallengeCard key={challenge.id} challenge={challenge} />
           ))}

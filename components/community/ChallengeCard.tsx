@@ -15,6 +15,13 @@ import { RARITY_LABEL, asRarity } from "@/components/community/MedalBadge";
 import { unitLabel, type ShareCardData, type ShareStat } from "@/lib/share-card";
 import type { ChallengeView } from "@/lib/community";
 
+/** "10 sept" en hora Chile, para "en verificación desde…". */
+function shortDate(iso: string): string {
+  return new Intl.DateTimeFormat("es-CL", { day: "numeric", month: "short", timeZone: "America/Santiago" })
+    .format(new Date(iso))
+    .replace(".", "");
+}
+
 export function ChallengeCard({ challenge, highlight }: { challenge: ChallengeView; highlight?: boolean }) {
   const router = useRouter();
   const [state, setState] = useState(challenge);
@@ -118,7 +125,7 @@ export function ChallengeCard({ challenge, highlight }: { challenge: ChallengeVi
       } else {
         setState((s) =>
           s.criterio === "evidencia"
-            ? { ...s, status: "en_verificacion" }
+            ? { ...s, status: "en_verificacion", submitted_at: new Date().toISOString() }
             : { ...s, count: Math.min(s.count + 1, s.goal) }
         );
       }
@@ -138,7 +145,7 @@ export function ChallengeCard({ challenge, highlight }: { challenge: ChallengeVi
         setError(result.error ?? "No pudimos subir la evidencia.");
         return;
       }
-      setState((s) => ({ ...s, status: "en_verificacion" }));
+      setState((s) => ({ ...s, status: "en_verificacion", submitted_at: new Date().toISOString() }));
       setReportOpen(false);
       setReportFile(null);
       setLogged({ title: "¡Evidencia enviada!", detail: "El equipo la revisa y te avisa. Mientras, cuéntalo." });
@@ -196,17 +203,23 @@ export function ChallengeCard({ challenge, highlight }: { challenge: ChallengeVi
             ) : state.criterio === "evidencia" ? (
               state.status === "en_verificacion" ? (
                 <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs font-bold text-amber-500">
-                  En verificación — el staff la revisa y te avisa
+                  En verificación{state.submitted_at ? ` desde el ${shortDate(state.submitted_at)}` : ""} · el staff la revisa y te avisa
                 </span>
               ) : (
                 <>
+                  {/* Rechazada: antes la tarjeta volvía a "Subir evidencia" sin decir nada. */}
+                  {state.status === "rechazado" && (
+                    <span className="rounded-full border border-red-500/30 bg-red-500/10 px-3.5 py-2 text-xs font-semibold text-red-400">
+                      No se aprobó · inténtalo de nuevo
+                    </span>
+                  )}
                   <button
                     type="button"
                     onClick={() => setReportOpen(true)}
                     disabled={pending}
                     className="flex items-center gap-2 rounded-full border border-[var(--sline2)] px-4 py-2.5 font-heading text-xs font-semibold text-[var(--smut)] transition hover:bg-[var(--shover)] disabled:opacity-60"
                   >
-                    <Upload className="h-3.5 w-3.5" /> {pending ? "Subiendo…" : "Subir evidencia"}
+                    <Upload className="h-3.5 w-3.5" /> {pending ? "Subiendo…" : state.status === "rechazado" ? "Subir otra evidencia" : "Subir evidencia"}
                   </button>
                 </>
               )

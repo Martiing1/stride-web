@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { SITE } from "./site";
 import { MOTIVATION_LABELS } from "./lead-options";
 import type { Motivation } from "./types";
 
@@ -128,4 +129,52 @@ export function memberAccessEmailHtml(firstName: string, link: string, code: str
       </p>
     </td></tr></table>
   </div>`;
+}
+
+// ─── Cola de verificación ────────────────────────────────────────────────────
+
+interface ReviewAlert {
+  kind: "reto" | "medalla" | "pausa";
+  memberName: string;
+  title: string;
+}
+
+/**
+ * Avisa al staff (mismos destinatarios que los leads) que entró algo a la
+ * cola de verificación. Sin aviso, una evidencia podía esperar días sin que
+ * nadie abriera el ERP. Nunca bota la acción del miembro: traga sus errores.
+ */
+export async function notifyStaffReview(item: ReviewAlert): Promise<void> {
+  const apiKey = process.env.RESEND_API_KEY;
+  const to = (process.env.LEADS_NOTIFY_TO ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (!apiKey || to.length === 0) return;
+
+  const label = item.kind === "reto" ? "Evidencia de reto" : item.kind === "medalla" ? "Medalla física" : "Solicitud de pausa";
+  // admin.stridechile.cl sirve /admin/* sin el prefijo (middleware).
+  const queueUrl = `${SITE.adminUrl}/miembros`;
+  try {
+    await new Resend(apiKey).emails.send({
+      from: process.env.LEADS_NOTIFY_FROM ?? "STRIDE <hola@stridechile.cl>",
+      to,
+      subject: `${label} por verificar: ${item.memberName}`,
+      html: `
+        <div style="font-family:system-ui,-apple-system,sans-serif;max-width:520px">
+          <h2 style="color:#7C3AED;margin-bottom:4px">${label} esperando tu visto bueno</h2>
+          <p style="margin:12px 0"><strong>${escapeHtml(item.memberName)}</strong> · ${escapeHtml(item.title)}</p>
+          <p><a href="${queueUrl}" style="display:inline-block;background:#7C3AED;color:#fff;padding:10px 18px;border-radius:999px;text-decoration:none;font-weight:600">Abrir la cola de verificación</a></p>
+          <p style="margin-top:24px;font-size:13px;color:#888">Aprobar paga los puntos al tiro y le avisa por la campana.</p>
+        </div>
+      `,
+    });
+  } catch (error) {
+    console.error("[resend] notifyStaffReview", error);
+  }
+}
+
+function escapeHtml(value: string): string {
+  const map: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+  return value.replace(/[&<>"']/g, (c) => map[c] ?? c);
 }

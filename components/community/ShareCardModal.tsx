@@ -299,6 +299,12 @@ export function ShareCardModal({ data, onClose }: { data: ShareCardData; onClose
               </button>
             </div>
           )}
+
+          {/* Etiquetar no llega a la plataforma: Instagram no le habla a la web. */}
+          <p className="text-center text-[11px] leading-relaxed text-[var(--sdim)]">
+            Etiqueta a <b className="text-[var(--smut)]">@stridechile</b> y lo compartimos desde nuestra cuenta. Para que cuente en
+            el reto, regístralo aquí en la plataforma.
+          </p>
         </div>
       </div>
     </div>

@@ -3,7 +3,7 @@ import { DISTINCTION } from "@/lib/community-shared";
 
 import { createServiceClient } from "./supabase/server";
 import { safeQuery } from "./safe-query";
-import { todayInChile } from "./membership";
+import { addDaysIso, NO_WEEK, todayInChile, weekStartChile } from "./membership";
 
 /**
  * Capa de datos de la COMUNIDAD de miembros (migración 012).
@@ -88,6 +88,8 @@ export interface ChallengeView {
   count: number;
   status: "en_curso" | "en_verificacion" | "cumplido" | "rechazado";
   completed_at: string | null;
+  /** Último envío o avance: sirve para "en verificación desde…". */
+  submitted_at: string | null;
 }
 
 export interface VitrinaMedal {
@@ -675,7 +677,11 @@ function addDays(date: string, days: number): string {
 
 export async function getChallenges(memberId: string): Promise<ChallengeView[]> {
   const service = createServiceClient();
-  const monthStart = todayInChile().slice(0, 7) + "-01";
+  const today = todayInChile();
+  const monthStart = today.slice(0, 7) + "-01";
+  // Micro-retos: semana en curso, lunes a domingo hora Chile.
+  const week = weekStartChile(today);
+  const weekEnd = addDaysIso(week, 6);
 
   const challenges = await safeQuery(
     () =>
@@ -690,19 +696,21 @@ export async function getChallenges(memberId: string): Promise<ChallengeView[]> 
   );
   if (challenges.length === 0) return [];
 
+  // El avance de un micro-reto vive en su semana; el resto usa la centinela.
   const progress = await safeQuery(
     () =>
       service
         .from("challenge_progress")
-        .select("challenge_id, count, status, completed_at")
+        .select("challenge_id, count, status, completed_at, updated_at, week_start")
         .eq("member_id", memberId)
-        .in("challenge_id", challenges.map((c) => c.id)),
-    [] as Array<{ challenge_id: string; count: number; status: ChallengeView["status"]; completed_at: string | null }>
+        .in("challenge_id", challenges.map((c) => c.id))
+        .in("week_start", [NO_WEEK, week]),
+    [] as Array<{ challenge_id: string; count: number; status: ChallengeView["status"]; completed_at: string | null; updated_at: string; week_start: string }>
   );
 
-  // Retos de asistencia: solo Social Runs del mes (las sesiones online dan
-  // puntos pero no avanzan el reto de asistencia).
-  const { from, to } = currentMonthBoundsChile();
+  // Retos de asistencia: solo Social Runs, por fecha del evento (no por cuándo
+  // se importó la planilla). El del mes cuenta el mes; el micro-reto, la semana.
+  const since = week < monthStart ? week : monthStart;
   const attendance = await safeQuery(
     () =>
       service
@@ -710,15 +718,18 @@ export async function getChallenges(memberId: string): Promise<ChallengeView[]> 
         .select("id, events!inner(event_date, event_type)")
         .eq("member_id", memberId)
         .like("events.event_type", "social_run%")
-        .gte("created_at", from)
-        .lt("created_at", to)
-        .returns<Array<{ id: string }>>(),
-    [] as Array<{ id: string }>
+        .gte("events.event_date", since)
+        .returns<Array<{ id: string; events: { event_date: string } }>>(),
+    [] as Array<{ id: string; events: { event_date: string } }>
   );
+  const runDates = attendance.map((a) => a.events.event_date);
+  const monthRuns = runDates.filter((d) => d >= monthStart).length;
+  const weekRuns = runDates.filter((d) => d >= week && d <= weekEnd).length;
 
   return challenges.map((c) => {
-    const p = progress.find((x) => x.challenge_id === c.id);
-    const count = c.criterio === "asistencia" ? attendance.length : p?.count ?? 0;
+    const weekly = c.period === "semana";
+    const p = progress.find((x) => x.challenge_id === c.id && x.week_start === (weekly ? week : NO_WEEK));
+    const count = c.criterio === "asistencia" ? (weekly ? weekRuns : monthRuns) : p?.count ?? 0;
     const status: ChallengeView["status"] =
       p?.status ?? (c.criterio === "asistencia" && count >= c.goal ? "cumplido" : "en_curso");
     return {
@@ -734,8 +745,31 @@ export async function getChallenges(memberId: string): Promise<ChallengeView[]> 
       count: Math.min(count, c.goal),
       status,
       completed_at: p?.completed_at ?? null,
+      submitted_at: p?.updated_at ?? null,
     };
   });
+}
+
+/**
+ * Cuántas cosas esperan al staff (evidencias, medallas físicas, pausas):
+ * alimenta el contador de la barra admin dentro de /miembros.
+ */
+export async function getPendingReviewCount(): Promise<number> {
+  const service = createServiceClient();
+  const countOf = async (table: string, column: string, value: string) => {
+    const { count } = await service.from(table).select("id", { count: "exact", head: true }).eq(column, value);
+    return count ?? 0;
+  };
+  try {
+    const counts = await Promise.all([
+      countOf("challenge_progress", "status", "en_verificacion"),
+      countOf("member_medals", "status", "en_revision"),
+      countOf("pause_requests", "status", "pendiente"),
+    ]);
+    return counts.reduce((a, b) => a + b, 0);
+  } catch {
+    return 0;
+  }
 }
 
 // ─── Medallas ────────────────────────────────────────────────────────────────

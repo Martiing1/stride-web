@@ -1,12 +1,13 @@
 import { IdCard, ShieldCheck } from "lucide-react";
 import { requireTeamMember } from "@/lib/auth";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
-import { isMembershipValid, formatDateCL } from "@/lib/membership";
+import { isMembershipValid, formatDateCL, todayInChile, addDaysIso } from "@/lib/membership";
+import { matchByName } from "@/lib/attendance-match";
 import { safeQuery } from "@/lib/safe-query";
 import { NewMemberForm } from "@/components/admin/NewMemberForm";
 import { MemberRow } from "@/components/admin/MemberRow";
 import { CommunityQueues, type QueueItem } from "@/components/admin/CommunityQueues";
-import { EventlyImport } from "@/components/admin/CommunityTools";
+import { EventlyImport, UnmatchedAttendance, type UnmatchedRow } from "@/components/admin/CommunityTools";
 import type { Member } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +23,9 @@ export default async function MiembrosPage() {
   const supabase = await createClient();
   const service = createServiceClient();
 
-  const [{ data }, evidencias, fisicas, pausas, events] = await Promise.all([
+  // Asistentes sin miembro enlazado de los últimos dos meses: se enlazan a mano.
+  const unmatchedSince = addDaysIso(todayInChile(), -60);
+  const [{ data }, evidencias, fisicas, pausas, events, sinMatch] = await Promise.all([
     supabase.from("members").select("*").order("created_at", { ascending: false }),
     safeQuery(
       () =>
@@ -64,10 +67,34 @@ export default async function MiembrosPage() {
           .limit(20),
       [] as Array<{ id: string; title: string; event_date: string }>
     ),
+    safeQuery(
+      () =>
+        service
+          .from("event_attendance")
+          .select("id, attendee_name, attendee_email, events!inner(title, event_date)")
+          .is("member_id", null)
+          .gte("events.event_date", unmatchedSince)
+          .order("attendee_name")
+          .limit(400)
+          .returns<Array<{ id: string; attendee_name: string | null; attendee_email: string; events: { title: string; event_date: string } }>>(),
+      [] as Array<{ id: string; attendee_name: string | null; attendee_email: string; events: { title: string; event_date: string } }>
+    ),
   ]);
 
   const members = (data ?? []) as Member[];
   const active = members.filter(isMembershipValid).length;
+
+  // Sugerencia de enlace por nombre completo (solo cuando no hay ambigüedad).
+  const unmatchedInput = sinMatch.map((row) => ({ ...row, name: row.attendee_name }));
+  const suggestions = matchByName(unmatchedInput, members);
+  const unmatchedRows: UnmatchedRow[] = unmatchedInput.map((row) => ({
+    id: row.id,
+    name: row.attendee_name,
+    email: row.attendee_email,
+    eventTitle: row.events.title,
+    eventDate: row.events.event_date,
+    suggestedMemberId: suggestions.get(row) ?? null,
+  }));
 
   const sign = async (path: string | null, bucket: string) => {
     if (!path) return null;
@@ -116,6 +143,15 @@ export default async function MiembrosPage() {
             La asistencia se acredita con el .xlsx que exporta Evently de cada Social Run: alimenta los retos de asistencia y las métricas del evento.
           </p>
           <EventlyImport events={events} />
+          {unmatchedRows.length > 0 && (
+            <div className="mt-5 border-t border-white/5 pt-5">
+              <h4 className="font-heading font-bold text-white">Sin match: enlázalos a mano</h4>
+              <p className="mt-1 mb-3 text-xs text-white/40">
+                Se inscribieron en Evently con otro correo. Elige el miembro y «Enlazar» les acredita la asistencia y sus puntos.
+              </p>
+              <UnmatchedAttendance rows={unmatchedRows} members={members.map((m) => ({ id: m.id, full_name: m.full_name }))} />
+            </div>
+          )}
         </div>
       </section>
 

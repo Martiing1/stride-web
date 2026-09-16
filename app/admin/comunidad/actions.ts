@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireTeamMember } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
 import { addPoints, getPointsWeights, notify } from "@/lib/community";
+import { matchByName } from "@/lib/attendance-match";
 
 /**
  * Acciones del staff sobre la comunidad: verificar retos, validar medallas
@@ -48,7 +49,7 @@ export async function resolveChallengeProgress(
       kind: "reto",
       href: "/miembros/retos",
     });
-    revalidatePath("/admin/comunidad");
+    revalidatePath("/admin/miembros");
     return { ok: true };
   }
 
@@ -65,7 +66,8 @@ export async function resolveChallengeProgress(
 
   const source =
     challenge.period === "mes" ? "reto_mes" : challenge.period === "semana" ? "micro_reto" : "reto_general";
-  await addPoints(progress.member_id, challenge.points, source, `Reto verificado: ${challenge.title}`, challenge.id);
+  // Un micro-reto se paga cada semana: la referencia del candado es la fila semanal.
+  await addPoints(progress.member_id, challenge.points, source, `Reto verificado: ${challenge.title}`, challenge.period === "semana" ? progressId : challenge.id);
   if (challenge.medal_id) {
     await service.from("member_medals").insert({
       member_id: progress.member_id,
@@ -78,10 +80,10 @@ export async function resolveChallengeProgress(
   await notify(progress.member_id, {
     title: `¡Reto cumplido! ${challenge.title}`,
     body: `+${challenge.points} pts${challenge.medal_id ? " · medalla a tu vitrina 🏅" : ""}`,
-    kind: "medal",
-    href: "/miembros/perfil",
+    kind: challenge.medal_id ? "medal" : "reto",
+    href: challenge.medal_id ? "/miembros/perfil" : "/miembros/retos",
   });
-  revalidatePath("/admin/comunidad");
+  revalidatePath("/admin/miembros");
   return { ok: true };
 }
 
@@ -113,7 +115,7 @@ export async function resolvePhysicalMedal(medalId: string, approve: boolean): P
     kind: "medal",
     href: "/miembros/perfil",
   });
-  revalidatePath("/admin/comunidad");
+  revalidatePath("/admin/miembros");
   return { ok: true };
 }
 
@@ -145,7 +147,7 @@ export async function resolvePause(pauseId: string, approve: boolean): Promise<A
     kind: "pausa",
     href: "/miembros/perfil",
   });
-  revalidatePath("/admin/comunidad");
+  revalidatePath("/admin/miembros");
   return { ok: true };
 }
 
@@ -226,27 +228,34 @@ export async function importEventlyCsv(formData: FormData): Promise<AdminResult>
       .map((m) => [m.email!.trim().toLowerCase(), m])
   );
 
-  const weights = await getPointsWeights();
-  const isSocialRun = event.event_type.startsWith("social_run");
+  // Filas limpias: email + nombre. Si el email no calza con ningún miembro,
+  // se intenta por nombre completo (solo cuando no hay ambigüedad).
+  const parsed = attendees
+    .map((row) => ({
+      email: (row[emailIdx] ?? "").trim().toLowerCase(),
+      name:
+        [nameIdx, lastNameIdx]
+          .filter((idx) => idx >= 0)
+          .map((idx) => (row[idx] ?? "").trim())
+          .filter(Boolean)
+          .join(" ") || null,
+    }))
+    .filter((row) => row.email);
+  const byName = matchByName(parsed.filter((row) => !byEmail.has(row.email)), members ?? []);
+
   let matched = 0;
+  let matchedByName = 0;
   let unmatched = 0;
   let duplicated = 0;
 
-  for (const row of attendees) {
-    const email = (row[emailIdx] ?? "").trim().toLowerCase();
-    if (!email) continue;
-    const name = [nameIdx, lastNameIdx]
-      .filter((idx) => idx >= 0)
-      .map((idx) => (row[idx] ?? "").trim())
-      .filter(Boolean)
-      .join(" ");
-    const member = byEmail.get(email);
+  for (const row of parsed) {
+    const memberId = byEmail.get(row.email)?.id ?? byName.get(row) ?? null;
 
     const { error } = await service.from("event_attendance").insert({
       event_id: eventId,
-      member_id: member?.id ?? null,
-      attendee_name: name || null,
-      attendee_email: email,
+      member_id: memberId,
+      attendee_name: row.name,
+      attendee_email: row.email,
       source: "evently_csv",
       imported_by: staff.id,
     });
@@ -255,32 +264,65 @@ export async function importEventlyCsv(formData: FormData): Promise<AdminResult>
       if (`${error.code}`.includes("23505")) duplicated++;
       continue;
     }
-    if (member) {
+    if (memberId) {
       matched++;
-      await addPoints(
-        member.id,
-        isSocialRun ? weights.social_run : weights.sesion_online,
-        isSocialRun ? "social_run" : "sesion_online",
-        `Asistencia: ${event.title}`,
-        eventId
-      );
-      await notify(member.id, {
-        title: `¡Gracias por venir! ${event.title}`,
-        body: `+${isSocialRun ? weights.social_run : weights.sesion_online} pts · tu racha sigue viva 🔥`,
-        kind: "event",
-        href: "/miembros/perfil",
-      });
+      if (!byEmail.has(row.email)) matchedByName++;
+      await creditAttendance(memberId, event);
     } else {
       unmatched++;
     }
   }
 
-  revalidatePath("/admin/comunidad");
+  revalidatePath("/admin/miembros");
   const ignored = onlyValidated && skipped > 0 ? ` · ${skipped} inscritos sin validar en puerta (no se acreditan)` : "";
+  const byNameNote = matchedByName > 0 ? ` (${matchedByName} por nombre)` : "";
   return {
     ok: true,
-    summary: `${matched} miembros acreditados · ${unmatched} sin match (guardados para revisar) · ${duplicated} ya estaban${ignored}`,
+    summary: `${matched} miembros acreditados${byNameNote} · ${unmatched} sin match (enlázalos abajo) · ${duplicated} ya estaban${ignored}`,
   };
+}
+
+/** Puntos + aviso por la campana por asistir. Lo comparten el import y el enlace manual. */
+async function creditAttendance(memberId: string, event: { id: string; title: string; event_type: string }): Promise<void> {
+  const weights = await getPointsWeights();
+  const isSocialRun = event.event_type.startsWith("social_run");
+  const points = isSocialRun ? weights.social_run : weights.sesion_online;
+  await addPoints(memberId, points, isSocialRun ? "social_run" : "sesion_online", `Asistencia: ${event.title}`, event.id);
+  await notify(memberId, {
+    title: `¡Gracias por venir! ${event.title}`,
+    body: `+${points} pts · tu racha sigue viva 🔥`,
+    kind: "event",
+    href: "/miembros/perfil",
+  });
+}
+
+/**
+ * Enlaza a mano una fila de asistencia sin match con un miembro (se inscribió
+ * con otro correo) y le acredita puntos y aviso como si hubiera calzado.
+ */
+export async function linkAttendance(attendanceId: string, memberId: string): Promise<AdminResult> {
+  await requireTeamMember(["socio", "lider_comunidad"]);
+  const service = createServiceClient();
+
+  const { data: rowRaw } = await service
+    .from("event_attendance")
+    .select("id, member_id, events:event_id(id, title, event_type)")
+    .eq("id", attendanceId)
+    .maybeSingle();
+  const row = rowRaw as unknown as {
+    id: string; member_id: string | null; events: { id: string; title: string; event_type: string } | null;
+  } | null;
+  if (!row || !row.events) return err("No encontramos esa fila.");
+  if (row.member_id) return err("Esa fila ya está enlazada.");
+
+  const { error } = await service.from("event_attendance").update({ member_id: memberId }).eq("id", attendanceId);
+  if (error) {
+    if (`${error.code}`.includes("23505")) return err("Ese miembro ya tiene la asistencia de este evento.");
+    return err("No pudimos enlazar.");
+  }
+  await creditAttendance(memberId, row.events);
+  revalidatePath("/admin/miembros");
+  return { ok: true };
 }
 
 /** Encabezado comparable: sin mayúsculas ni tildes. */

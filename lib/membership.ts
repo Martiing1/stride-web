@@ -14,15 +14,39 @@ export function isMembershipValid(member: Pick<Member, "status" | "valid_until">
   return member.valid_until >= todayInChile();
 }
 
-/** Fecha de hoy en Chile (YYYY-MM-DD). El servidor de Vercel corre en UTC. */
-export function todayInChile(): string {
+/** Fecha (YYYY-MM-DD) en Chile de un instante dado. El servidor de Vercel corre en UTC. */
+export function dateInChile(at: Date | string = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Santiago",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).format(new Date());
+  }).format(typeof at === "string" ? new Date(at) : at);
 }
+
+/** Fecha de hoy en Chile (YYYY-MM-DD). */
+export function todayInChile(): string {
+  return dateInChile(new Date());
+}
+
+/** Suma días a una fecha YYYY-MM-DD (aritmética de calendario, sin zona). */
+export function addDaysIso(date: string, days: number): string {
+  const d = new Date(date + "T12:00:00Z");
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Lunes (YYYY-MM-DD) de la semana que contiene la fecha dada. Los micro-retos
+ * corren de lunes a domingo, hora Chile, y se reinician cada lunes.
+ */
+export function weekStartChile(date: string = todayInChile()): string {
+  const day = (new Date(date + "T12:00:00Z").getUTCDay() + 6) % 7; // lunes = 0
+  return addDaysIso(date, -day);
+}
+
+/** Semana centinela del avance en retos que no son semanales. */
+export const NO_WEEK = "1970-01-01";
 
 export function formatDateCL(date: string | null): string {
   if (!date) return "Sin vencimiento";
